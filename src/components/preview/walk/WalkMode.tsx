@@ -14,6 +14,13 @@ import type { PointerLockControls as PointerLockControlsImpl } from "three-stdli
 
 const LOCK_SURFACE_ID = "walk-lock-surface";
 
+const HOUSE_PRESETS = [
+  { label: "Full", value: 1 },
+  { label: "Half", value: 0.45 },
+  { label: "Show", value: 0.12 },
+  { label: "Blackout", value: 0 },
+] as const;
+
 const TONE_CLASS = {
   ok: "text-emerald-300",
   warn: "text-amber-300",
@@ -72,6 +79,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
   const [signalId, setSignalId] = useState<TestSignalId>("pink");
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.7);
+  const [houseLights, setHouseLights] = useState(1);
   const [reading, setReading] = useState<SplReading | null>(null);
 
   const onReading = useCallback((r: SplReading) => setReading(r), []);
@@ -111,7 +119,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
           className="h-full w-full"
         >
           <Suspense fallback={null}>
-            <VenueScene config={config} mode="walk" />
+            <VenueScene config={config} mode="walk" houseLights={houseLights} />
           </Suspense>
           <WalkControls
             config={config}
@@ -121,7 +129,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
             controlsRef={controlsRef}
           />
           <SpatialAudio config={config} signalId={signalId} playing={playing} volume={volume} />
-          <SplProbe config={config} onReading={onReading} />
+          <SplProbe config={config} volume={volume} onReading={onReading} />
         </Canvas>
       </PreviewErrorBoundary>
 
@@ -152,17 +160,61 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
         </div>
 
         <div className="flex items-end justify-between gap-4">
-          <Panel>
-            <p className="text-[10px] font-semibold tracking-[0.08em] text-white/45 uppercase">
-              Controls
-            </p>
-            <p className="mt-1 text-xs text-white/70">
-              <span className="font-semibold text-white">WASD</span> move ·{" "}
-              <span className="font-semibold text-white">Shift</span> run ·{" "}
-              <span className="font-semibold text-white">Mouse</span> look ·{" "}
-              <span className="font-semibold text-white">Esc</span> release
-            </p>
-          </Panel>
+          <div className="flex flex-col gap-3">
+            <Panel className="w-72">
+              <div className="flex items-baseline justify-between">
+                <p className="text-[10px] font-semibold tracking-[0.08em] text-white/45 uppercase">
+                  House lights
+                </p>
+                <span className="font-mono text-[11px] text-white/50 tabular-nums">
+                  {Math.round(houseLights * 100)}%
+                </span>
+              </div>
+
+              <div className="mt-2 flex gap-1.5">
+                {HOUSE_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setHouseLights(p.value)}
+                    className={`flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold transition ${
+                      Math.abs(houseLights - p.value) < 0.01
+                        ? "bg-amber-300 text-black"
+                        : "bg-white/10 text-white/70 hover:bg-white/20"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={houseLights}
+                onChange={(e) => setHouseLights(Number(e.target.value))}
+                aria-label="House light level"
+                className="mt-2.5 w-full accent-amber-300"
+              />
+              <p className="mt-1.5 text-[10px] leading-relaxed text-white/35">
+                Dim the room to see what the rig alone actually puts on stage.
+              </p>
+            </Panel>
+
+            <Panel>
+              <p className="text-[10px] font-semibold tracking-[0.08em] text-white/45 uppercase">
+                Controls
+              </p>
+              <p className="mt-1 text-xs text-white/70">
+                <span className="font-semibold text-white">WASD</span> move ·{" "}
+                <span className="font-semibold text-white">Shift</span> run ·{" "}
+                <span className="font-semibold text-white">Mouse</span> look ·{" "}
+                <span className="font-semibold text-white">Esc</span> release
+              </p>
+            </Panel>
+          </div>
 
           <Panel className="w-72">
             <p className="text-[10px] font-semibold tracking-[0.08em] text-white/45 uppercase">

@@ -34,6 +34,18 @@ const PAR_INTENSITY = 150;
 /** Cans stand downstage and tilt back toward the deck. */
 const PAR_TILT = -1;
 
+/** House lighting at full, before the dimmer scales it. */
+const HOUSE = {
+  ambient: 0.34,
+  hemi: 0.6,
+  key: 2.1,
+  fill: 0.5,
+  rim: 0.3,
+  env: 0.4,
+} as const;
+/** Never quite black — you still need to find your way around the room. */
+const BLACKOUT_AMBIENT = 0.03;
+
 /** Deterministic 0..1 hash so crowd variation stays stable across renders. */
 function hash(i: number, salt = 0) {
   const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
@@ -924,27 +936,39 @@ function SceneControls({ lengthM, depthM }: { lengthM: number; depthM: number })
 export function VenueScene({
   config,
   mode = "orbit",
+  houseLights = 1,
 }: {
   config: PlayConfig;
   mode?: SceneMode;
+  /** 1 = house lights up, 0 = blackout. Only the room wash dims; the rig doesn't. */
+  houseLights?: number;
 }) {
   const { venue, stage, screen, lighting } = config;
   const { L, D, stageZ, speakers, subs } = useMemo(() => computeVenueLayout(config), [config]);
   const groupRef = useRef<Group>(null);
 
+  const hl = THREE.MathUtils.clamp(houseLights, 0, 1);
+  // Beams are scattered light — barely visible in a bright room, obvious once
+  // the house comes down. That inversion is most of the "lights off" effect.
+  const beamOpacity = 0.05 + 0.2 * (1 - hl);
+  const fogColor = useMemo(
+    () => new THREE.Color("#c3cfdd").lerp(new THREE.Color("#05070c"), 1 - hl),
+    [hl],
+  );
+
   return (
     <>
-      <Backdrop />
-      <fog attach="fog" args={["#c3cfdd", 34, 96]} />
+      <Backdrop dim={hl} />
+      <fog attach="fog" args={[fogColor, 34, 96]} />
 
       {mode === "orbit" ? <SceneControls lengthM={L} depthM={D} /> : null}
 
-      {/* Key / fill / rim */}
-      <ambientLight intensity={0.34} />
-      <hemisphereLight args={["#eaf2ff", "#7d8a99", 0.6]} />
+      {/* House wash: key / fill / rim, all under the dimmer */}
+      <ambientLight intensity={BLACKOUT_AMBIENT + HOUSE.ambient * hl} />
+      <hemisphereLight args={["#eaf2ff", "#7d8a99", HOUSE.hemi * hl]} />
       <directionalLight
         position={[12, 17, 9]}
-        intensity={2.1}
+        intensity={HOUSE.key * hl}
         color="#fff6e8"
         castShadow
         shadow-mapSize-width={2048}
@@ -957,11 +981,11 @@ export function VenueScene({
         shadow-camera-top={24}
         shadow-camera-bottom={-24}
       />
-      <directionalLight position={[-9, 7, -6]} intensity={0.5} color="#9fc4ff" />
-      <directionalLight position={[0, 5, 16]} intensity={0.3} color="#dfe9f7" />
+      <directionalLight position={[-9, 7, -6]} intensity={HOUSE.fill * hl} color="#9fc4ff" />
+      <directionalLight position={[0, 5, 16]} intensity={HOUSE.rim * hl} color="#dfe9f7" />
 
       <Suspense fallback={null}>
-        <Environment preset="city" environmentIntensity={0.4} />
+        <Environment preset="city" environmentIntensity={HOUSE.env * hl} />
       </Suspense>
 
       <group ref={groupRef}>
@@ -997,7 +1021,7 @@ export function VenueScene({
           stageWidth={stage.widthM}
           stageZ={stageZ}
           stageHeight={stage.heightM}
-          beamOpacity={lighting.package === "none" ? 0 : 0.22}
+          beamOpacity={lighting.package === "none" ? 0 : beamOpacity}
         />
 
         <Audience

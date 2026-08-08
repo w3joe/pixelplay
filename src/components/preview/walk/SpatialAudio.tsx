@@ -143,13 +143,16 @@ export function SpatialAudio({
 /**
  * Samples estimated SPL at the camera and reports it upward. Throttled — the
  * HUD does not need this at frame rate, and it would thrash React if it did.
+ * Dynamically adjusts estimated dB SPL based on master volume slider.
  */
 export function SplProbe({
   config,
+  volume = 1,
   onReading,
   hz = 10,
 }: {
   config: PlayConfig;
+  volume?: number;
   onReading: (r: SplReading) => void;
   hz?: number;
 }) {
@@ -173,7 +176,17 @@ export function SplProbe({
     if (accumulator.current < 1 / hz) return;
     accumulator.current = 0;
     const listenerAt: Vec3 = [camera.position.x, camera.position.y, camera.position.z];
-    onReading(estimateSplAt(listenerAt, sources.speakers, sources.subs));
+    const rawReading = estimateSplAt(listenerAt, sources.speakers, sources.subs);
+
+    // Scale dB SPL based on volume slider position: dB_offset = 20 * log10(volume)
+    const volOffsetDb = volume > 0.001 ? 20 * Math.log10(volume) : -100;
+    const scaledTotalDb = Math.max(0, rawReading.totalDb + volOffsetDb);
+
+    onReading({
+      ...rawReading,
+      totalDb: scaledTotalDb,
+      perSpeakerDb: rawReading.perSpeakerDb.map((db) => Math.max(0, db + volOffsetDb)),
+    });
   });
 
   return null;
