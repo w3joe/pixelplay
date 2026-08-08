@@ -18,9 +18,9 @@ import * as THREE from "three";
 const dbToGain = (db: number) => 10 ** (db / 20);
 
 /**
- * Builds the listener/panner graph for the walkthrough. Positions come from
- * computeVenueLayout — the same source the visible speakers use — so what you
- * hear always lines up with what you can see.
+ * Builds the 3D spatial listener & panner audio graph for the walkthrough.
+ * Positions come from computeVenueLayout — matching what you see on stage.
+ * Subwoofers generate omnidirectional 3D low-end spatial response with proximity rumble.
  */
 export function SpatialAudio({
   config,
@@ -49,7 +49,7 @@ export function SpatialAudio({
     };
   }, [camera]);
 
-  // One voice per box. Rebuilt when the rig or the source signal changes.
+  // One voice per speaker & subwoofer. Rebuilt when layout or test signal changes.
   useEffect(() => {
     if (!listener) return;
     const buffer = createTestSignal(listener.context, signalId);
@@ -66,10 +66,9 @@ export function SpatialAudio({
       return a;
     };
 
+    // 1. Full-range Main PA Speakers
     for (const p of layout.speakers) {
       const a = base(1.4, 1.2);
-      // Dispersion: standing off to the side of a PA box is quieter, and these
-      // are the same numbers the SPL readout uses.
       a.setDirectionalCone(
         PA_CONE.innerAngleDeg,
         PA_CONE.outerAngleDeg,
@@ -81,12 +80,17 @@ export function SpatialAudio({
       created.push(a);
     }
 
+    // 2. Subwoofers — 3D spatial low-frequency acoustic response
     for (const p of layout.subs) {
-      // Subs are omnidirectional, band-limited, and carry further.
-      const a = base(3, 0.8);
+      // Subwoofers use near-field reference distance & stronger rolloff for proximity bass punch
+      const a = base(1.2, 1.5);
+
+      // Lowpass crossover filter with resonant Q for punchy low-end rumble
       const lp = listener.context.createBiquadFilter();
       lp.type = "lowpass";
       lp.frequency.value = SUB_CROSSOVER_HZ;
+      lp.Q.value = 2.0; // Warm low-end resonance peak near crossover
+
       a.setFilter(lp);
       a.position.set(p[0], SUB_ACOUSTIC_CENTRE_M, p[2]);
       scene.add(a);
@@ -95,8 +99,7 @@ export function SpatialAudio({
 
     setVoices(created);
 
-    // Dev-only handle so the audio graph can be asserted from a headless
-    // browser, where nothing is actually audible.
+    // Dev-only handle so the audio graph can be asserted
     if (process.env.NODE_ENV !== "production") {
       (window as unknown as { __pixelplayAudio?: unknown }).__pixelplayAudio = {
         get state() {
@@ -121,11 +124,10 @@ export function SpatialAudio({
     };
   }, [listener, layout, signalId, scene]);
 
-  // Transport. Every voice starts in the same tick so they stay aligned.
+  // Transport control
   useEffect(() => {
     if (!listener || voices.length === 0) return;
     if (playing) {
-      // Browsers hand back a suspended context until a user gesture.
       void listener.context.resume();
       for (const a of voices) if (!a.isPlaying) a.play();
     } else {
@@ -141,9 +143,7 @@ export function SpatialAudio({
 }
 
 /**
- * Samples estimated SPL at the camera and reports it upward. Throttled — the
- * HUD does not need this at frame rate, and it would thrash React if it did.
- * Dynamically adjusts estimated dB SPL based on master volume slider.
+ * Samples estimated SPL at the camera position including subwoofer spatial proximity.
  */
 export function SplProbe({
   config,
@@ -186,6 +186,7 @@ export function SplProbe({
       ...rawReading,
       totalDb: scaledTotalDb,
       perSpeakerDb: rawReading.perSpeakerDb.map((db) => Math.max(0, db + volOffsetDb)),
+      perSubDb: rawReading.perSubDb.map((db) => Math.max(0, db + volOffsetDb)),
     });
   });
 

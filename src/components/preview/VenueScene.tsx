@@ -29,7 +29,6 @@ const MOVER_BEAM_LEN = 5;
 const MOVER_INTENSITY = 240;
 
 const PAR_ANGLE = 0.5; // ~29°, a broad wash
-const PAR_BEAM_LEN = 5.5;
 const PAR_INTENSITY = 150;
 /** Cans stand downstage and tilt back toward the deck. */
 const PAR_TILT = -1;
@@ -411,10 +410,14 @@ function LedWall({
 
       {!isProj ? (
         <pointLight
+          // Candela, not a 0-1 dial: at ~3m this is what it takes for a wall
+          // this size to visibly throw colour onto the stage and performers.
           position={[0, heightM * 0.55, 1.4]}
-          intensity={isOutdoor ? 3.2 : 2.2}
+          intensity={isOutdoor ? 80 : 48}
           color={spill}
-          distance={14}
+          // Kept short: a wall this size lights the stage and the front rows,
+          // it does not wash the whole hall teal.
+          distance={15}
           decay={2}
         />
       ) : (
@@ -608,11 +611,9 @@ function MovingHead({
 function ParCan({
   position,
   color,
-  beamOpacity,
 }: {
   position: [number, number, number];
   color: string;
-  beamOpacity: number;
 }) {
   const target = useMemo(() => new THREE.Object3D(), []);
 
@@ -644,17 +645,9 @@ function ParCan({
           <meshBasicMaterial color={color} />
         </mesh>
 
-        <mesh position={[0, 0.16 + PAR_BEAM_LEN / 2, 0]} rotation={[Math.PI, 0, 0]}>
-          <coneGeometry args={[Math.tan(PAR_ANGLE) * PAR_BEAM_LEN, PAR_BEAM_LEN, 24, 1, true]} />
-          <meshBasicMaterial
-            color={color}
-            transparent
-            opacity={beamOpacity * 0.55}
-            side={THREE.DoubleSide}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
+        {/* No volumetric shaft here on purpose: a wash this wide only shows a
+            visible beam through haze, and the open cone's far rim reads as a
+            big bright disc floating over the stage. The lit surfaces sell it. */}
 
         <primitive object={target} position={[0, 20, 0]} />
         <spotLight
@@ -727,7 +720,6 @@ function LightRig({
               // the stage footprint and they clip up through it.
               position={[stageLength * t * 0.75, 0, stageZ + stageWidth / 2 + 0.9]}
               color={i === 0 ? "#ffb347" : "#ff8fa3"}
-              beamOpacity={beamOpacity}
             />
           ))
         : null}

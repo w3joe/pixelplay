@@ -14,7 +14,7 @@ export const PA_CONE = {
 export const PA_REF_SPL_1M = 100;
 
 /** Subs are omnidirectional and reach further, so they roll off more slowly. */
-export const SUB_REF_SPL_1M = 98;
+export const SUB_REF_SPL_1M = 102;
 export const SUB_CROSSOVER_HZ = 120;
 
 /**
@@ -32,8 +32,12 @@ export interface SplReading {
   totalDb: number;
   /** Distance to the closest speaker, in metres. */
   nearestM: number;
+  /** Distance to the closest subwoofer, in metres. */
+  nearestSubM: number;
   /** Contribution of each speaker, same order as the input. */
   perSpeakerDb: number[];
+  /** Contribution of each sub, same order as the input. */
+  perSubDb: number[];
 }
 
 /**
@@ -74,6 +78,13 @@ function sourceDb(refDb: number, dist: number, offAxisDb: number): number {
   return refDb - 20 * Math.log10(Math.max(dist, MIN_DISTANCE_M)) + offAxisDb;
 }
 
+/** Near-field sub proximity bass boost for subwoofers (< 2.5m). */
+function subProximityDb(dist: number): number {
+  if (dist >= 2.5) return 0;
+  // Up to +4.5dB extra low-end pressure when standing right next to sub cabinets
+  return (1 - dist / 2.5) * 4.5;
+}
+
 /** Combine independent sources: they add in power, not in pressure. */
 export function sumDb(levels: number[]): number {
   if (levels.length === 0) return 0;
@@ -83,10 +94,7 @@ export function sumDb(levels: number[]): number {
 
 /**
  * Free-field estimate of sound pressure at a point in the room.
- *
- * Deliberately simple: inverse-square plus a dispersion cone. It models no room
- * gain, reflections, or absorption, so a real ballroom will run louder than
- * this predicts. Indicative only — not fed into the sufficiency checks.
+ * Accounts for 3D spatial position relative to both main PA speakers and subwoofers.
  */
 export function estimateSplAt(
   listener: Vec3,
@@ -101,17 +109,26 @@ export function estimateSplAt(
     ),
   );
 
-  // Subs radiate omnidirectionally, so they take no cone penalty.
-  const perSubDb = subs.map((p) => sourceDb(SUB_REF_SPL_1M, distance(p, listener), 0));
+  // Subwoofers radiate omnidirectionally with near-field proximity bass boost
+  const perSubDb = subs.map((p) => {
+    const d = distance(p, listener);
+    return sourceDb(SUB_REF_SPL_1M, d, 0) + subProximityDb(d);
+  });
 
   const nearestM = speakers.length
     ? Math.min(...speakers.map((s) => distance(s.position, listener)))
     : Number.POSITIVE_INFINITY;
 
+  const nearestSubM = subs.length
+    ? Math.min(...subs.map((p) => distance(p, listener)))
+    : Number.POSITIVE_INFINITY;
+
   return {
     totalDb: sumDb([...perSpeakerDb, ...perSubDb]),
     nearestM,
+    nearestSubM,
     perSpeakerDb,
+    perSubDb,
   };
 }
 

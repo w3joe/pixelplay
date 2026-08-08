@@ -59,11 +59,20 @@ function Readout({ reading }: { reading: SplReading | null }) {
         />
       </div>
       <p className={`mt-2 text-xs font-semibold ${TONE_CLASS[verdict.tone]}`}>{verdict.label}</p>
-      <p className="mt-0.5 text-[11px] text-white/45 tabular-nums">
-        {Number.isFinite(reading.nearestM)
-          ? `${reading.nearestM.toFixed(1)} m to nearest speaker`
-          : "No speakers placed"}
-      </p>
+      <div className="mt-1 space-y-0.5 text-[11px] text-white/50 tabular-nums">
+        <p>
+          {Number.isFinite(reading.nearestM)
+            ? `${reading.nearestM.toFixed(1)} m to nearest main PA`
+            : "No speakers placed"}
+        </p>
+        {Number.isFinite(reading.nearestSubM) && (
+          <p className={reading.nearestSubM < 2.5 ? "text-amber-300 font-semibold" : ""}>
+            {`${reading.nearestSubM.toFixed(1)} m to nearest sub ${
+              reading.nearestSubM < 2.5 ? "🔥 (Sub Proximity)" : ""
+            }`}
+          </p>
+        )}
+      </div>
       <p className="mt-2 text-[10px] leading-relaxed text-white/35">
         Free-field estimate — ignores room gain and reflections.
       </p>
@@ -130,12 +139,18 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
           />
           <SpatialAudio config={config} signalId={signalId} playing={playing} volume={volume} />
           <SplProbe config={config} volume={volume} onReading={onReading} />
+          <Tablet state={tabletState} onAction={onTabletAction} />
         </Canvas>
       </PreviewErrorBoundary>
 
-      {/* Clicking anywhere that isn't a control grabs the pointer. drei binds
-          its lock handler to this element specifically. */}
-      <div id={LOCK_SURFACE_ID} className="absolute inset-0" aria-hidden="true" />
+      {/* Grabs the pointer on click while unlocked; drei binds its lock handler
+          to this element specifically. Once locked it must stop swallowing
+          events, or clicks never reach the canvas and the tablet is dead. */}
+      <div
+        id={LOCK_SURFACE_ID}
+        className={`absolute inset-0 ${locked ? "pointer-events-none" : ""}`}
+        aria-hidden="true"
+      />
 
       {/* HUD — transparent to clicks except on the controls themselves. */}
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-5">
