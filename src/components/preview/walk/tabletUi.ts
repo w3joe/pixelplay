@@ -305,8 +305,10 @@ export function draw(ctx: CanvasRenderingContext2D, state: TabletState, hovered:
   ctx.fillStyle = MUTED;
   ctx.font = `500 20px ${FONT}`;
   ctx.fillText("WASD move · Shift run · Mouse look", COL_L, AUDIO_TOP + 54);
-  ctx.fillText("Aim the crosshair here and click", COL_L, AUDIO_TOP + 84);
-  ctx.fillText("Esc releases the pointer", COL_L, AUDIO_TOP + 114);
+  ctx.fillStyle = INK;
+  ctx.fillText("E puts the tablet away", COL_L, AUDIO_TOP + 84);
+  ctx.fillStyle = MUTED;
+  ctx.fillText("Aim the crosshair here and click", COL_L, AUDIO_TOP + 114);
 
   /* ---- Right: house lights ---- */
   label(ctx, "House lights", COL_R, HOUSE_TOP + 20);

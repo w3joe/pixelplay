@@ -30,6 +30,17 @@ const KEY_BINDINGS: Record<string, "forward" | "back" | "left" | "right"> = {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
+/**
+ * Pitch the view drops to when the tablet is called up with E. Comfortably past
+ * the tablet's own engage threshold, so its yaw freezes and the crosshair can
+ * sweep the whole face.
+ */
+const TABLET_VIEW_PITCH = -0.95;
+/** Radians per second the view swings while snapping to or from the tablet. */
+const SNAP_SPEED = 4.5;
+
+const tmpEuler = new THREE.Euler(0, 0, 0, "YXZ");
+
 export function WalkControls({
   config,
   lockSelector,
@@ -48,6 +59,8 @@ export function WalkControls({
   const { stage } = config;
 
   const keys = useRef({ forward: false, back: false, left: false, right: false, run: false });
+  /** Pitch the view is swinging toward, or null when the mouse has the view. */
+  const snapTarget = useRef<number | null>(null);
   const velocity = useRef(new THREE.Vector3());
   const forwardVec = useRef(new THREE.Vector3());
   const rightVec = useRef(new THREE.Vector3());
@@ -66,6 +79,15 @@ export function WalkControls({
         keys.current.run = down;
         return;
       }
+      // E calls the tablet up and puts it away again. Toggles off whatever the
+      // current pitch is, so it works whether you got there by mouse or by key.
+      if (e.code === "KeyE") {
+        if (!down || e.repeat) return;
+        e.preventDefault();
+        tmpEuler.setFromQuaternion(camera.quaternion, "YXZ");
+        snapTarget.current = tmpEuler.x < TABLET_VIEW_PITCH / 2 ? 0 : TABLET_VIEW_PITCH;
+        return;
+      }
       const action = KEY_BINDINGS[e.code];
       if (!action) return;
       // Stop arrow keys scrolling the page underneath the overlay.
@@ -80,15 +102,22 @@ export function WalkControls({
       keys.current = { forward: false, back: false, left: false, right: false, run: false };
     };
 
+    // Moving the mouse hands the view straight back to the player mid-snap.
+    const onMouseMove = (e: MouseEvent) => {
+      if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) snapTarget.current = null;
+    };
+
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
     window.addEventListener("blur", clear);
+    window.addEventListener("mousemove", onMouseMove);
     return () => {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
       window.removeEventListener("blur", clear);
+      window.removeEventListener("mousemove", onMouseMove);
     };
-  }, []);
+  }, [camera]);
 
   useFrame((_, rawDelta) => {
     // A backgrounded tab can hand back a huge delta; don't teleport on return.
@@ -137,6 +166,16 @@ export function WalkControls({
       targetY,
       Math.min(1, dt * STEP_RESPONSE),
     );
+
+    // Swing the view to or from the tablet after an E press.
+    if (snapTarget.current !== null) {
+      const target = snapTarget.current;
+      tmpEuler.setFromQuaternion(camera.quaternion, "YXZ");
+      const next = THREE.MathUtils.damp(tmpEuler.x, target, SNAP_SPEED, dt);
+      tmpEuler.x = Math.abs(next - target) < 0.004 ? target : next;
+      camera.quaternion.setFromEuler(tmpEuler);
+      if (tmpEuler.x === target) snapTarget.current = null;
+    }
   });
 
   return (

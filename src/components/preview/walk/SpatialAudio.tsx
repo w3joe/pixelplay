@@ -99,21 +99,6 @@ export function SpatialAudio({
 
     setVoices(created);
 
-    // Dev-only handle so the audio graph can be asserted
-    if (process.env.NODE_ENV !== "production") {
-      (window as unknown as { __pixelplayAudio?: unknown }).__pixelplayAudio = {
-        get state() {
-          return listener.context.state;
-        },
-        get voices() {
-          return created.length;
-        },
-        get playing() {
-          return created.filter((a) => a.isPlaying).length;
-        },
-      };
-    }
-
     return () => {
       for (const a of created) {
         if (a.isPlaying) a.stop();

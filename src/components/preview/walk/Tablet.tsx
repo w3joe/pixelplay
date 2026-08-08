@@ -15,16 +15,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import * as THREE from "three";
 
-/** Physical size of the slab, in metres — roughly a 14" tablet. */
-const SCREEN_W = 0.36;
+/** Physical size of the slab, in metres. */
+const SCREEN_W = 0.44;
 const SCREEN_H = SCREEN_W * (TABLET_H / TABLET_W);
-const BEZEL = 0.014;
+const BEZEL = 0.016;
 
 /** Held low and tilted back, so it comes into frame as you look down. */
-const HOLD_POSITION: [number, number, number] = [0, -0.5, -0.44];
+const HOLD_POSITION: [number, number, number] = [0, -0.46, -0.42];
 const HOLD_TILT = -1.12;
 
+/**
+ * Drawn after everything else with depth testing off. You can walk through the
+ * crowd, so without this a guest standing on your toes renders in front of the
+ * tablet you're holding.
+ */
+const ON_TOP = 1000;
+
 const tmpEuler = new THREE.Euler(0, 0, 0, "YXZ");
+
+/**
+ * Below this pitch the tablet is "raised" and its yaw freezes, so mouse-look
+ * sweeps the crosshair across its face instead of dragging the tablet along.
+ * Without this the tablet tracks yaw rigidly, sits dead-centre forever, and
+ * every control outside the middle column is unreachable.
+ */
+const ENGAGE_PITCH = -0.62;
+/** If you turn this far while raised, let it follow again so it can't be lost. */
+const MAX_YAW_OFFSET = 0.5;
 
 export function Tablet({
   state,
@@ -60,14 +77,38 @@ export function Tablet({
     texture.needsUpdate = true;
   }, [canvas, texture, state, hovered]);
 
-  // Follow the camera's position and yaw but deliberately not its pitch: the
-  // tablet is held in the hands, so looking down brings it into view instead
-  // of it being pinned to the middle of the screen.
+  const heldYaw = useRef(0);
+  const raised = useRef(false);
+
+  // Follows position always, and yaw only while lowered — never pitch, so
+  // looking down brings it into view rather than pinning it to the screen.
   useFrame(() => {
     if (!rig.current) return;
     tmpEuler.setFromQuaternion(camera.quaternion, "YXZ");
+    const yaw = tmpEuler.y;
+
+    if (tmpEuler.x > ENGAGE_PITCH) {
+      // Lowered: carried along with the body.
+      heldYaw.current = yaw;
+      raised.current = false;
+    } else {
+      if (!raised.current) {
+        heldYaw.current = yaw;
+        raised.current = true;
+      }
+      // Raised: yaw is frozen so the crosshair can sweep across the face,
+      // but it gives chase if you turn far enough to lose it.
+      const delta = Math.atan2(
+        Math.sin(yaw - heldYaw.current),
+        Math.cos(yaw - heldYaw.current),
+      );
+      if (Math.abs(delta) > MAX_YAW_OFFSET) {
+        heldYaw.current += delta - Math.sign(delta) * MAX_YAW_OFFSET;
+      }
+    }
+
     rig.current.position.copy(camera.position);
-    rig.current.rotation.y = tmpEuler.y;
+    rig.current.rotation.y = heldYaw.current;
   });
 
   const readUv = (e: ThreeEvent<PointerEvent>) => e.uv ?? null;
@@ -80,11 +121,18 @@ export function Tablet({
           radius={0.008}
           smoothness={4}
           position={[0, 0, -0.008]}
+          renderOrder={ON_TOP}
         >
-          <meshStandardMaterial color="#0b1119" metalness={0.55} roughness={0.42} />
+          <meshStandardMaterial
+            color="#0b1119"
+            metalness={0.55}
+            roughness={0.42}
+            depthTest={false}
+          />
         </RoundedBox>
 
         <mesh
+          renderOrder={ON_TOP + 1}
           onPointerMove={(e) => {
             e.stopPropagation();
             const uv = readUv(e);
@@ -106,7 +154,7 @@ export function Tablet({
           <planeGeometry args={[SCREEN_W, SCREEN_H]} />
           {/* Self-lit: a screen shouldn't dim with the house lights, and it
               stays readable at full blackout. */}
-          <meshBasicMaterial map={texture} toneMapped={false} />
+          <meshBasicMaterial map={texture} toneMapped={false} depthTest={false} />
         </mesh>
 
         {/* Faint glow of the screen spilling onto the holder's hands */}
