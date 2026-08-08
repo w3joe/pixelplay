@@ -112,13 +112,67 @@ export function SpatialAudio({
   // Transport control
   useEffect(() => {
     if (!listener || voices.length === 0) return;
+
+    const playVoices = () => {
+      for (const a of voices) {
+        if (!a.isPlaying) {
+          try {
+            a.play();
+          } catch {
+            // ignore
+          }
+        }
+      }
+    };
+
+    const stopVoices = () => {
+      for (const a of voices) {
+        if (a.isPlaying) {
+          try {
+            a.pause();
+          } catch {
+            // ignore
+          }
+        }
+      }
+    };
+
     if (playing) {
-      void listener.context.resume();
-      for (const a of voices) if (!a.isPlaying) a.play();
+      if (listener.context.state === "suspended") {
+        listener.context
+          .resume()
+          .then(() => playVoices())
+          .catch(() => playVoices());
+      } else {
+        playVoices();
+      }
     } else {
-      for (const a of voices) if (a.isPlaying) a.pause();
+      stopVoices();
     }
   }, [playing, voices, listener]);
+
+  // Keep voices playing when AudioContext transitions to running
+  useEffect(() => {
+    if (!listener) return;
+    const ctx = listener.context;
+    const handleState = () => {
+      if (ctx.state === "running" && playing && voices.length > 0) {
+        for (const a of voices) {
+          if (!a.isPlaying) {
+            try {
+              a.play();
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+    };
+    ctx.addEventListener("statechange", handleState);
+    return () => {
+      ctx.removeEventListener("statechange", handleState);
+    };
+  }, [listener, playing, voices]);
 
   useEffect(() => {
     listener?.setMasterVolume(volume);

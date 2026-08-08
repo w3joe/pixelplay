@@ -63,6 +63,11 @@ describe("tablet hit testing", () => {
     expect(hitTest(u, v)?.type).toBe("playing");
   });
 
+  it("recognises the exit button", () => {
+    const [u, v] = centreOf("exit");
+    expect(hitTest(u, v)?.type).toBe("exit");
+  });
+
   it("maps slider position to a 0..1 value", () => {
     const r = layout().find((x) => x.id === "volume")!;
     const left = hitTest(...uvAt(r.x + 1, r.y + r.h / 2));

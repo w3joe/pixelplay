@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState, useMemo } from "react";
 import { PixelLoader } from "@/components/loading/PixelLoader";
-import { playPixelClick } from "@/lib/audio/pixelSynth";
 import { CheckList } from "@/components/checks/CheckList";
 import { PriceRange } from "@/components/pricing/PriceRange";
 import { AudioStep } from "@/components/wizard/AudioStep";
@@ -226,22 +225,8 @@ export function WizardShell() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                playPixelClick();
-                setShowLoader(true);
-              }}
-              className="flex items-center gap-2 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent-soft)] px-3 py-1.5 font-silkscreen text-xs font-semibold text-[var(--accent-ink)] transition hover:bg-[var(--accent)] hover:text-white shadow-xs"
-              title="Replay Pixel Loading Screen"
-            >
-              <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent)]" />
-              <span>PIXEL BOOT</span>
-            </button>
-            <div className="hidden sm:block">
-              <StatusPill fails={failCount} warns={warnCount} />
-            </div>
+          <div className="hidden sm:block">
+            <StatusPill fails={failCount} warns={warnCount} />
           </div>
         </div>
       </header>

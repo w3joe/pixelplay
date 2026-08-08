@@ -84,6 +84,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [houseLights, setHouseLights] = useState(1);
+  const [fogActive, setFogActive] = useState(config.lighting.fogMachine ?? false);
   const [reading, setReading] = useState<SplReading | null>(null);
 
   const onReading = useCallback((r: SplReading) => setReading(r), []);
@@ -97,8 +98,9 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
       signalId,
       playing,
       volume,
+      fogActive,
     }),
-    [config.venue.name, reading, houseLights, signalId, playing, volume],
+    [config.venue.name, reading, houseLights, signalId, playing, volume, fogActive],
   );
 
   const onTabletAction = useCallback((a: TabletAction) => {
@@ -115,8 +117,14 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
       case "volume":
         setVolume(a.value);
         break;
+      case "fog":
+        setFogActive(a.value);
+        break;
+      case "exit":
+        onExit();
+        break;
     }
-  }, []);
+  }, [onExit]);
 
   // Fullscreen is requested from the button's click handler, since the API
   // only accepts a real user gesture and an effect runs outside of one. All
@@ -153,7 +161,12 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
           className="h-full w-full"
         >
           <Suspense fallback={null}>
-            <VenueScene config={config} mode="walk" houseLights={houseLights} />
+            <VenueScene
+              config={config}
+              mode="walk"
+              houseLights={houseLights}
+              fogActive={fogActive}
+            />
           </Suspense>
           <WalkControls
             config={config}
@@ -175,6 +188,12 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
         id={LOCK_SURFACE_ID}
         className={`absolute inset-0 ${locked ? "pointer-events-none" : ""}`}
         aria-hidden="true"
+        onClick={() => {
+          const ctx = THREE.AudioContext.getContext() as unknown as AudioContext;
+          if (ctx && ctx.state === "suspended") {
+            void ctx.resume();
+          }
+        }}
       />
 
       {/* HUD — transparent to clicks except on the controls themselves. */}
@@ -226,7 +245,13 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
             <div className="mt-4 flex justify-center gap-2">
               <button
                 type="button"
-                onClick={() => controlsRef.current?.lock()}
+                onClick={() => {
+                  const ctx = THREE.AudioContext.getContext() as unknown as AudioContext;
+                  if (ctx && ctx.state === "suspended") {
+                    void ctx.resume();
+                  }
+                  controlsRef.current?.lock();
+                }}
                 className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-teal-300"
               >
                 Resume

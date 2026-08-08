@@ -94,6 +94,12 @@ export interface AudioConfig {
 
 export interface LightingConfig {
   package: LightingPackage;
+  /** PAR cans in the wash. Ignored unless the package includes PAR. */
+  parCount: number;
+  /** Moving heads on the truss. Ignored unless the package includes movers. */
+  movingHeadCount: number;
+  /** Fog / haze machine for atmospheric light beam effects. */
+  fogMachine?: boolean;
 }
 
 export interface ExtrasConfig {

@@ -2,7 +2,7 @@
 
 import { ContactShadows, Environment, OrbitControls, RoundedBox } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { computeVenueLayout } from "@/lib/layout";
+import { computeVenueLayout, type Vec3 } from "@/lib/layout";
 import type { PlayConfig } from "@/lib/types";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import type { Group } from "three";
@@ -518,11 +518,13 @@ function MovingHead({
   color,
   phase,
   beamOpacity,
+  hasFog,
 }: {
   position: [number, number, number];
   color: string;
   phase: number;
   beamOpacity: number;
+  hasFog?: boolean;
 }) {
   const pan = useRef<Group>(null);
   const tilt = useRef<Group>(null);
@@ -584,6 +586,22 @@ function MovingHead({
               depthWrite={false}
             />
           </mesh>
+          {/* Concentrated inner core beam when fog/haze is active */}
+          {hasFog ? (
+            <mesh position={[0, -0.18 - MOVER_BEAM_LEN / 2, 0]}>
+              <coneGeometry
+                args={[Math.tan(MOVER_ANGLE * 0.38) * MOVER_BEAM_LEN, MOVER_BEAM_LEN, 20, 1, true]}
+              />
+              <meshBasicMaterial
+                color="#ffffff"
+                transparent
+                opacity={Math.min(0.6, beamOpacity * 1.4)}
+                side={THREE.DoubleSide}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
+            </mesh>
+          ) : null}
 
           <primitive object={target} position={[0, -20, 0]} />
           <spotLight
@@ -611,11 +629,16 @@ function MovingHead({
 function ParCan({
   position,
   color,
+  hasFog,
+  beamOpacity,
 }: {
   position: [number, number, number];
   color: string;
+  hasFog?: boolean;
+  beamOpacity?: number;
 }) {
   const target = useMemo(() => new THREE.Object3D(), []);
+  const washLen = 12;
 
   return (
     <group position={position}>
@@ -645,9 +668,20 @@ function ParCan({
           <meshBasicMaterial color={color} />
         </mesh>
 
-        {/* No volumetric shaft here on purpose: a wash this wide only shows a
-            visible beam through haze, and the open cone's far rim reads as a
-            big bright disc floating over the stage. The lit surfaces sell it. */}
+        {/* Volumetric PAR wash light shaft when fog is active */}
+        {hasFog && beamOpacity ? (
+          <mesh position={[0, 0.16 + washLen / 2, 0]}>
+            <coneGeometry args={[Math.tan(PAR_ANGLE) * washLen, washLen, 24, 1, true]} />
+            <meshBasicMaterial
+              color={color}
+              transparent
+              opacity={beamOpacity * 0.65}
+              side={THREE.DoubleSide}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        ) : null}
 
         <primitive object={target} position={[0, 20, 0]} />
         <spotLight
@@ -665,26 +699,44 @@ function ParCan({
   );
 }
 
+/** Evenly spaced offsets in [-half, half]; a single fixture sits centred. */
+function spread(count: number, half: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [0];
+  return Array.from({ length: count }, (_, i) => -half + (2 * half * i) / (count - 1));
+}
+
+const MOVER_COLORS = ["#6aa8ff", "#14d4b8", "#c58bff"];
+const PAR_COLORS = ["#ffb347", "#ff8fa3"];
+
 function LightRig({
   packageType,
+  parCount,
+  movingHeadCount,
   stageLength,
   stageWidth,
   stageZ,
   stageHeight,
   beamOpacity,
+  hasFog,
 }: {
   packageType: PlayConfig["lighting"]["package"];
+  parCount: number;
+  movingHeadCount: number;
   stageLength: number;
   stageWidth: number;
   stageZ: number;
   stageHeight: number;
   beamOpacity: number;
+  hasFog?: boolean;
 }) {
   if (packageType === "none") return null;
-  const showPar = packageType === "par_wash" || packageType === "both";
-  const showMovers = packageType === "moving_heads" || packageType === "both";
+  const showPar = (packageType === "par_wash" || packageType === "both") && parCount > 0;
+  const showMovers =
+    (packageType === "moving_heads" || packageType === "both") && movingHeadCount > 0;
   const y = stageHeight + 2.9;
-  const barLength = Math.max(stageLength * 0.92, 2.5);
+  // Grow the truss so a big rig doesn't stack fixtures on top of each other.
+  const barLength = Math.max(stageLength * 0.92, 2.5, movingHeadCount * 0.55);
 
   return (
     <group>
@@ -700,26 +752,30 @@ function LightRig({
               <meshStandardMaterial {...METAL} />
             </mesh>
           ))}
-          {[-0.34, 0, 0.34].map((t, i) => (
+          {spread(movingHeadCount, 0.38).map((t, i) => (
             <MovingHead
               key={i}
               position={[barLength * t, y - 0.16, stageZ - 0.2]}
-              color={i === 1 ? "#14d4b8" : "#6aa8ff"}
+              color={MOVER_COLORS[i % MOVER_COLORS.length]}
+              // Offset phases so the beams sweep out of sync, not in lockstep.
               phase={i * 2.1}
               beamOpacity={beamOpacity}
+              hasFog={hasFog}
             />
           ))}
         </>
       ) : null}
 
       {showPar
-        ? [-0.42, 0.42].map((t, i) => (
+        ? spread(parCount, 0.315).map((t, i) => (
             <ParCan
               key={i}
               // Stands go on the floor downstage of the deck — anywhere within
               // the stage footprint and they clip up through it.
-              position={[stageLength * t * 0.75, 0, stageZ + stageWidth / 2 + 0.9]}
-              color={i === 0 ? "#ffb347" : "#ff8fa3"}
+              position={[stageLength * t, 0, stageZ + stageWidth / 2 + 0.9]}
+              color={PAR_COLORS[i % PAR_COLORS.length]}
+              hasFog={hasFog}
+              beamOpacity={beamOpacity}
             />
           ))
         : null}
@@ -917,6 +973,152 @@ function SceneControls({ lengthM, depthM }: { lengthM: number; depthM: number })
 }
 
 
+let cachedSmokeTexture: THREE.CanvasTexture | null = null;
+
+function getSmokeTexture(): THREE.CanvasTexture {
+  if (typeof window === "undefined") {
+    return new THREE.CanvasTexture(document.createElement("canvas"));
+  }
+  if (cachedSmokeTexture) return cachedSmokeTexture;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  // Smooth multi-stop radial gradient for soft organic cloud puffs
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+  grad.addColorStop(0.2, "rgba(242, 248, 255, 0.70)");
+  grad.addColorStop(0.45, "rgba(220, 238, 255, 0.35)");
+  grad.addColorStop(0.7, "rgba(200, 225, 245, 0.12)");
+  grad.addColorStop(1, "rgba(180, 210, 235, 0)");
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+
+  // Soft turbulence overlay
+  for (let i = 0; i < 18; i++) {
+    const x = 128 + Math.sin(i * 1.7) * 45;
+    const y = 128 + Math.cos(i * 2.3) * 45;
+    const r = 25 + (Math.sin(i * 3.1) + 1) * 20;
+    const pGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    pGrad.addColorStop(0, "rgba(255, 255, 255, 0.22)");
+    pGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = pGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  cachedSmokeTexture = new THREE.CanvasTexture(canvas);
+  cachedSmokeTexture.needsUpdate = true;
+  return cachedSmokeTexture;
+}
+
+function StageFog({
+  active,
+  stageZ,
+  stageWidth,
+  stageLength,
+}: {
+  active: boolean;
+  stageZ: number;
+  stageWidth: number;
+  stageLength: number;
+}) {
+  const groupRef = useRef<Group>(null);
+  const smokeMap = useMemo(() => getSmokeTexture(), []);
+
+  // 26 volumetric smoke cloud puffs across 3 altitude layers
+  const puffs = useMemo(() => {
+    return Array.from({ length: 26 }, (_, i) => {
+      const layer = i < 10 ? 0 : i < 20 ? 1 : 2;
+
+      let y = 0.2 + hash(i, 1) * 0.7; // Low ground layer
+      let scale = 3.2 + hash(i, 2) * 2.5;
+      let baseOpacity = 0.16 + hash(i, 3) * 0.12;
+
+      if (layer === 1) {
+        y = 1.2 + hash(i, 1) * 2.2; // Mid-air stage & hall layer
+        scale = 3.8 + hash(i, 2) * 3.0;
+        baseOpacity = 0.12 + hash(i, 3) * 0.1;
+      } else if (layer === 2) {
+        y = 3.2 + hash(i, 1) * 2.5; // High overhead truss layer
+        scale = 4.5 + hash(i, 2) * 3.5;
+        baseOpacity = 0.08 + hash(i, 3) * 0.08;
+      }
+
+      const x = (hash(i, 4) - 0.5) * (stageLength + 4.5);
+      const z = stageZ + (hash(i, 5) - 0.4) * (stageWidth + 4.0);
+
+      return {
+        initialPos: [x, y, z] as Vec3,
+        scale,
+        baseOpacity,
+        rotSpeed: (hash(i, 6) - 0.5) * 0.08,
+        driftPhaseX: hash(i, 7) * Math.PI * 2,
+        driftPhaseY: hash(i, 8) * Math.PI * 2,
+        driftPhaseZ: hash(i, 9) * Math.PI * 2,
+        driftSpeedX: 0.15 + hash(i, 10) * 0.2,
+        driftSpeedY: 0.1 + hash(i, 11) * 0.15,
+        driftSpeedZ: 0.12 + hash(i, 12) * 0.18,
+      };
+    });
+  }, [stageZ, stageWidth, stageLength]);
+
+  useFrame(({ camera, clock }) => {
+    if (!groupRef.current || !active) return;
+    const t = clock.elapsedTime;
+
+    groupRef.current.children.forEach((child, i) => {
+      const p = puffs[i];
+      if (!p || !child) return;
+
+      // Dynamic 3D billboarding: always face the camera
+      child.lookAt(camera.position);
+
+      // Multi-axis floating turbulence
+      const x = p.initialPos[0] + Math.sin(t * p.driftSpeedX + p.driftPhaseX) * 0.45;
+      const y = p.initialPos[1] + Math.cos(t * p.driftSpeedY + p.driftPhaseY) * 0.25;
+      const z = p.initialPos[2] + Math.sin(t * p.driftSpeedZ + p.driftPhaseZ) * 0.35;
+      child.position.set(x, y, z);
+
+      // Scale & opacity breathing pulse
+      const scalePulse = 1 + 0.08 * Math.sin(t * 0.6 + p.driftPhaseY);
+      child.scale.setScalar(p.scale * scalePulse);
+
+      const mesh = child as THREE.Mesh;
+      if (mesh.material && mesh.material instanceof THREE.MeshBasicMaterial) {
+        const opacityPulse = p.baseOpacity * (0.8 + 0.2 * Math.sin(t * 0.7 + p.driftPhaseZ));
+        mesh.material.opacity = opacityPulse;
+      }
+    });
+  });
+
+  if (!active) return null;
+
+  return (
+    <group ref={groupRef}>
+      {puffs.map((p, i) => (
+        <mesh key={i} position={p.initialPos} scale={p.scale}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={smokeMap}
+            transparent
+            opacity={p.baseOpacity}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            side={THREE.DoubleSide}
+            color="#d8e8f8"
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /* ------------------------------------------------------------------- scene */
 
 /**
@@ -929,29 +1131,36 @@ export function VenueScene({
   config,
   mode = "orbit",
   houseLights = 1,
+  fogActive,
 }: {
   config: PlayConfig;
   mode?: SceneMode;
   /** 1 = house lights up, 0 = blackout. Only the room wash dims; the rig doesn't. */
   houseLights?: number;
+  /** Triggered fog effect */
+  fogActive?: boolean;
 }) {
   const { venue, stage, screen, lighting } = config;
   const { L, D, stageZ, speakers, subs } = useMemo(() => computeVenueLayout(config), [config]);
   const groupRef = useRef<Group>(null);
 
+  const hasFog = fogActive ?? lighting.fogMachine ?? false;
   const hl = THREE.MathUtils.clamp(houseLights, 0, 1);
   // Beams are scattered light — barely visible in a bright room, obvious once
-  // the house comes down. That inversion is most of the "lights off" effect.
-  const beamOpacity = 0.05 + 0.2 * (1 - hl);
+  // the house comes down or when fog/haze is active in the venue.
+  const beamOpacity = hasFog ? 0.32 + 0.28 * (1 - hl) : 0.05 + 0.2 * (1 - hl);
   const fogColor = useMemo(
-    () => new THREE.Color("#c3cfdd").lerp(new THREE.Color("#05070c"), 1 - hl),
-    [hl],
+    () => new THREE.Color(hasFog ? "#9cb2c6" : "#c3cfdd").lerp(new THREE.Color("#05070c"), 1 - hl),
+    [hl, hasFog],
   );
+
+  const fogNear = hasFog ? 4 : 34;
+  const fogFar = hasFog ? 38 : 96;
 
   return (
     <>
       <Backdrop dim={hl} />
-      <fog attach="fog" args={[fogColor, 34, 96]} />
+      <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
 
       {mode === "orbit" ? <SceneControls lengthM={L} depthM={D} /> : null}
 
@@ -1009,11 +1218,21 @@ export function VenueScene({
 
         <LightRig
           packageType={lighting.package}
+          parCount={lighting.parCount}
+          movingHeadCount={lighting.movingHeadCount}
           stageLength={stage.lengthM}
           stageWidth={stage.widthM}
           stageZ={stageZ}
           stageHeight={stage.heightM}
           beamOpacity={lighting.package === "none" ? 0 : beamOpacity}
+          hasFog={hasFog}
+        />
+
+        <StageFog
+          active={hasFog}
+          stageZ={stageZ}
+          stageWidth={stage.widthM}
+          stageLength={stage.lengthM}
         />
 
         <Audience

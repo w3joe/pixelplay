@@ -13,9 +13,11 @@ export function estimatePowerDrawW(config: PlayConfig): number {
   w += audio.speakerCount * POWER_DRAW_W.speakerEach;
   w += audio.subwooferCount * POWER_DRAW_W.subEach;
 
-  if (lighting.package === "par_wash" || lighting.package === "both") w += POWER_DRAW_W.parPackage;
+  if (lighting.package === "par_wash" || lighting.package === "both") {
+    w += lighting.parCount * POWER_DRAW_W.parEach;
+  }
   if (lighting.package === "moving_heads" || lighting.package === "both") {
-    w += POWER_DRAW_W.movingHeadsPackage;
+    w += lighting.movingHeadCount * POWER_DRAW_W.movingHeadEach;
   }
 
   return Math.round(w);

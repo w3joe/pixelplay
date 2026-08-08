@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { PixelCanvasMatrix } from "@/components/loading/PixelCanvasMatrix";
+import { useCallback, useEffect, useState } from "react";
 import {
   isAudioMuted,
   playPowerUp,
@@ -16,12 +15,18 @@ interface PixelLoaderProps {
 }
 
 const LOADING_STATUSES = [
-  "INITIALIZING PIXEL ENGINE...",
-  "LOADING 3D STAGE & LED WALL...",
-  "TUNING AUDIO & LIGHTING RIGS...",
-  "SYSTEM READY!",
+  "Warming up the engine…",
+  "Loading 3D stage & LED wall…",
+  "Tuning audio & lighting rigs…",
+  "Ready.",
 ];
 
+/**
+ * Boot splash — the first thing a visitor sees, so it carries the app's own
+ * design language (same card, accent, and type as the wizard) rather than a
+ * standalone visual identity. Shows once per visit and clears itself; there
+ * is no way to re-open it from inside the app.
+ */
 export function PixelLoader({ onComplete }: PixelLoaderProps) {
   const [progress, setProgress] = useState(0);
   const [statusIdx, setStatusIdx] = useState(0);
@@ -43,12 +48,12 @@ export function PixelLoader({ onComplete }: PixelLoaderProps) {
     setExiting(true);
     setTimeout(() => {
       onComplete();
-    }, 300); // Smooth fade transition
+    }, 300);
   }, [exiting, onComplete]);
 
-  // 1.5s (1500ms) loader sequence
+  // ~1.5s boot sequence, then hand off to the app.
   useEffect(() => {
-    const totalDuration = 1500; // 1.5 seconds
+    const totalDuration = 1500;
     const intervalTime = 25;
     const totalTicks = totalDuration / intervalTime;
     let tick = 0;
@@ -58,24 +63,18 @@ export function PixelLoader({ onComplete }: PixelLoaderProps) {
       const currentPct = Math.min(100, Math.floor((tick / totalTicks) * 100));
       setProgress(currentPct);
 
-      // Cycle status text across 1.5s
       const sIdx = Math.min(
         LOADING_STATUSES.length - 1,
-        Math.floor((currentPct / 100) * LOADING_STATUSES.length)
+        Math.floor((currentPct / 100) * LOADING_STATUSES.length),
       );
-
       setStatusIdx((prev) => {
-        if (prev !== sIdx) {
-          playStepChime(sIdx);
-        }
+        if (prev !== sIdx) playStepChime(sIdx);
         return sIdx;
       });
 
       if (currentPct >= 100) {
         clearInterval(timer);
-        setTimeout(() => {
-          handleStart();
-        }, 120); // Brief hold at 100% then transition
+        setTimeout(handleStart, 120);
       }
     }, intervalTime);
 
@@ -85,94 +84,64 @@ export function PixelLoader({ onComplete }: PixelLoaderProps) {
   const handleToggleMute = () => {
     const isMuted = toggleAudioMuted();
     setMuted(isMuted);
-    if (!isMuted) {
-      startMusicLoop();
-    }
+    if (!isMuted) startMusicLoop();
   };
-
-  // Segmented pixel bar calculations
-  const blockCount = 18;
-  const filledBlocks = Math.floor((progress / 100) * blockCount);
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#080c16] text-white select-none transition-opacity duration-300 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[var(--background)] transition-opacity duration-300 ${
         exiting ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
+      style={{
+        backgroundImage:
+          "radial-gradient(900px 520px at 8% -12%, #d9f2ec 0%, transparent 58%), radial-gradient(760px 460px at 96% -6%, #e2ecfa 0%, transparent 52%), linear-gradient(180deg, #f7fafc 0%, #eaeff5 100%)",
+      }}
     >
-      {/* Background Pixel LED Matrix */}
-      <PixelCanvasMatrix />
+      <div className="dot-grid absolute inset-0 opacity-40" aria-hidden="true" />
 
-      {/* CRT Scanline Overlay */}
-      <div className="crt-overlay absolute inset-0 z-10" />
+      <button
+        type="button"
+        onClick={handleToggleMute}
+        className="absolute top-4 right-4 z-10 inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)] shadow-[var(--shadow-xs)] transition hover:border-[var(--ink-subtle)] hover:text-[var(--ink)]"
+      >
+        <span
+          className={`h-2 w-2 rounded-full ${muted ? "bg-[var(--fail)]" : "bg-[var(--accent)]"}`}
+        />
+        {muted ? "Sound off" : "Sound on"}
+      </button>
 
-      {/* Mute Audio Controls */}
-      <div className="absolute top-4 right-4 z-30">
-        <button
-          type="button"
-          onClick={handleToggleMute}
-          className="flex items-center gap-2 rounded-lg border border-teal-500/40 bg-slate-900/80 px-3 py-1.5 font-silkscreen text-[11px] text-slate-300 transition hover:border-[var(--accent)] hover:text-white backdrop-blur-md"
-        >
-          {muted ? (
-            <>
-              <span className="h-2 w-2 rounded-full bg-rose-500" />
-              <span>AUDIO: OFF</span>
-            </>
-          ) : (
-            <>
-              <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent)]" />
-              <span>AUDIO: ON</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Center Pixel Content Card */}
-      <main className="relative z-20 flex w-full max-w-md flex-col items-center justify-center p-6 text-center">
-        {/* Pixel Badge */}
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-950/60 px-3.5 py-1 font-silkscreen text-[11px] text-[var(--accent)] backdrop-blur-md">
-          <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent)]" />
-          PIXELPRO ENGINE
+      <div className="card relative w-full max-w-sm p-8 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[#0b7d8f] shadow-[var(--shadow-accent)]">
+          <svg viewBox="0 0 16 16" className="h-6 w-6" aria-hidden="true">
+            <rect x="2" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
+            <rect x="9" y="2" width="5" height="5" rx="1" fill="white" fillOpacity="0.5" />
+            <rect x="2" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.5" />
+            <rect x="9" y="9" width="5" height="5" rx="1" fill="white" fillOpacity="0.95" />
+          </svg>
         </div>
 
-        {/* Big Pixel Title */}
-        <h1 className="font-pixel-arcade text-3xl sm:text-4xl font-bold tracking-wider text-pixel-glow text-white">
-          PIXEL<span className="text-[var(--accent)] text-pixel-neon">PLAY</span>
+        <h1 className="font-display mt-4 text-2xl font-bold tracking-tight text-[var(--ink)]">
+          Pixel<span className="text-[var(--accent)]">Play</span>
         </h1>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">Event tech planner by PixelPro</p>
 
-        <p className="font-silkscreen mt-2 text-xs sm:text-sm text-cyan-300/90 tracking-wide">
-          EVENT TECH PLANNER · SINGAPORE
-        </p>
-
-        {/* Pixel Progress Container */}
-        <div className="mt-6 w-full rounded-xl border border-teal-500/40 bg-slate-950/90 p-5 shadow-[0_0_30px_rgba(13,155,134,0.3)] backdrop-blur-xl">
-          <div className="mb-2.5 flex items-center justify-between font-silkscreen text-[11px] text-slate-400">
-            <span className="text-[var(--accent)] text-pixel-glow uppercase animate-pixel-flicker">
+        <div className="mt-6 text-left">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--ink-muted)]">
               {LOADING_STATUSES[statusIdx]}
             </span>
-            <span className="font-vt323 text-lg text-cyan-400">
+            <span className="text-xs font-semibold text-[var(--accent-ink)] tabular-nums">
               {progress}%
             </span>
           </div>
-
-          {/* Segmented Pixel Bar */}
-          <div className="flex h-5 w-full items-center gap-1 rounded-md border border-teal-500/50 bg-slate-900 p-1">
-            {Array.from({ length: blockCount }).map((_, i) => {
-              const filled = i < filledBlocks;
-              return (
-                <div
-                  key={i}
-                  className={`h-full flex-1 rounded-xs transition-all duration-100 ${
-                    filled
-                      ? "bg-gradient-to-t from-[var(--accent)] to-[#00f3ff] shadow-[0_0_8px_#00f3ff]"
-                      : "bg-slate-800/60"
-                  }`}
-                />
-              );
-            })}
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[#0b7d8f] transition-[width] duration-150 ease-out"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

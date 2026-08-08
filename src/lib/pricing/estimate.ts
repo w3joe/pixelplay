@@ -85,20 +85,30 @@ export function estimatePrice(config: PlayConfig): PriceEstimate {
     });
   }
 
-  if (config.lighting.package === "par_wash" || config.lighting.package === "both") {
+  const { package: pkg, parCount, movingHeadCount } = config.lighting;
+
+  if ((pkg === "par_wash" || pkg === "both") && parCount > 0) {
     lines.push({
       id: "par",
-      label: "PAR wash lighting package",
-      lowSgd: RATES.parWash.low,
-      highSgd: RATES.parWash.high,
+      label: `PAR wash ×${parCount}`,
+      lowSgd: parCount * RATES.parEach.low,
+      highSgd: parCount * RATES.parEach.high,
     });
   }
-  if (config.lighting.package === "moving_heads" || config.lighting.package === "both") {
+  if ((pkg === "moving_heads" || pkg === "both") && movingHeadCount > 0) {
     lines.push({
       id: "movers",
-      label: "Moving heads + truss",
-      lowSgd: RATES.movingHeadsTruss.low,
-      highSgd: RATES.movingHeadsTruss.high,
+      label: `Moving heads ×${movingHeadCount} + truss`,
+      lowSgd: movingHeadCount * RATES.movingHeadEach.low + RATES.movingHeadTrussBase.low,
+      highSgd: movingHeadCount * RATES.movingHeadEach.high + RATES.movingHeadTrussBase.high,
+    });
+  }
+  if (config.lighting.fogMachine) {
+    lines.push({
+      id: "fog",
+      label: "Fog / Haze machine",
+      lowSgd: RATES.fogMachine.low,
+      highSgd: RATES.fogMachine.high,
     });
   }
 

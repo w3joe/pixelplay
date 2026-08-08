@@ -14,8 +14,13 @@ export const RATES = {
   subwooferEach: { low: 150, high: 350 },
   stagePerSqm: { low: 80, high: 120 },
   stagePackageClamp: { low: 400, high: 1500 },
-  parWash: { low: 400, high: 1000 },
-  movingHeadsTruss: { low: 800, high: 2500 },
+  // Per-fixture, calibrated so the default rig (2 PAR, 3 movers) reproduces
+  // the flat package prices these replaced: 400–1000 and 800–2500.
+  parEach: { low: 200, high: 500 },
+  movingHeadEach: { low: 180, high: 550 },
+  /** Truss and rigging, charged once regardless of how many movers hang on it. */
+  movingHeadTrussBase: { low: 260, high: 850 },
+  fogMachine: { low: 150, high: 350 },
   photobooth: { low: 600, high: 1200 },
   micExtraEach: { low: 40, high: 80 },
 } as const;
@@ -29,8 +34,9 @@ export const POWER_DRAW_W = {
   outdoorLedPerSqm: 700,
   speakerEach: 650,
   subEach: 1000,
-  parPackage: 800,
-  movingHeadsPackage: 2000,
+  parEach: 400,
+  movingHeadEach: 650,
+  fogMachine: 1200,
   projector: 400,
 } as const;
 

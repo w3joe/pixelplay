@@ -26,13 +26,16 @@ export interface TabletState {
   signalId: TestSignalId;
   playing: boolean;
   volume: number;
+  fogActive: boolean;
 }
 
 export type TabletAction =
   | { type: "house"; value: number }
   | { type: "signal"; value: TestSignalId }
   | { type: "playing"; value: boolean }
-  | { type: "volume"; value: number };
+  | { type: "volume"; value: number }
+  | { type: "fog"; value: boolean }
+  | { type: "exit" };
 
 interface Region {
   id: string;
@@ -50,11 +53,21 @@ const COL_R = TABLET_W - PAD - COL_W;
 const BODY_TOP = 104;
 
 const HOUSE_TOP = BODY_TOP;
-const AUDIO_TOP = BODY_TOP + 250;
+const AUDIO_TOP = BODY_TOP + 260;
 
 /** Single source of layout truth — draw() and hitTest() both read this. */
 export function layout(): Region[] {
   const regions: Region[] = [];
+
+  // Exit button at top right of header
+  regions.push({
+    id: "exit",
+    x: TABLET_W - PAD - 110,
+    y: 28,
+    w: 110,
+    h: 42,
+    kind: "button",
+  });
 
   const presetW = (COL_W - 3 * 12) / 4;
   HOUSE_PRESETS.forEach((p, i) => {
@@ -71,9 +84,17 @@ export function layout(): Region[] {
     id: "house:slider",
     x: COL_R,
     y: HOUSE_TOP + 132,
-    w: COL_W,
+    w: COL_W - 200,
     h: 34,
     kind: "slider",
+  });
+  regions.push({
+    id: "fog",
+    x: COL_R + COL_W - 180,
+    y: HOUSE_TOP + 124,
+    w: 180,
+    h: 50,
+    kind: "button",
   });
 
   const srcW = (COL_W - 2 * 12) / 3;
@@ -110,6 +131,7 @@ export function hitTest(u: number, v: number): TabletAction | null {
     const pad = r.kind === "slider" ? 14 : 0;
     if (px < r.x || px > r.x + r.w || py < r.y - pad || py > r.y + r.h + pad) continue;
 
+    if (r.id === "exit") return { type: "exit" };
     if (r.id === "house:slider") {
       return { type: "house", value: clamp01((px - r.x) / r.w) };
     }
@@ -117,6 +139,7 @@ export function hitTest(u: number, v: number): TabletAction | null {
       return { type: "volume", value: clamp01((px - r.x) / r.w) };
     }
     if (r.id === "play") return { type: "playing", value: true };
+    if (r.id === "fog") return { type: "fog", value: true };
     if (r.id.startsWith("house:")) return { type: "house", value: Number(r.id.slice(6)) };
     if (r.id.startsWith("signal:")) {
       return { type: "signal", value: r.id.slice(7) as TestSignalId };
@@ -244,11 +267,24 @@ export function draw(ctx: CanvasRenderingContext2D, state: TabletState, hovered:
   ctx.fillStyle = INK;
   ctx.font = `700 27px ${FONT}`;
   ctx.fillText("Show control", PAD + 22, 64);
+
+  const exitRegion = find("exit");
+
   ctx.fillStyle = MUTED;
   ctx.font = `500 20px ${FONT}`;
   ctx.textAlign = "right";
-  ctx.fillText(state.venueName, TABLET_W - PAD, 64);
+  ctx.fillText(state.venueName, exitRegion.x - 20, 64);
   ctx.textAlign = "left";
+
+  // Exit Button on tablet
+  button(
+    ctx,
+    exitRegion,
+    "Exit ✕",
+    false,
+    hovered === "exit",
+    "#f43f5e",
+  );
 
   ctx.strokeStyle = "rgba(255,255,255,0.09)";
   ctx.lineWidth = 2;
@@ -308,7 +344,7 @@ export function draw(ctx: CanvasRenderingContext2D, state: TabletState, hovered:
   ctx.fillStyle = INK;
   ctx.fillText("E puts the tablet away", COL_L, AUDIO_TOP + 84);
   ctx.fillStyle = MUTED;
-  ctx.fillText("Aim the crosshair here and click", COL_L, AUDIO_TOP + 114);
+  ctx.fillText("Aim crosshair and click Exit to leave", COL_L, AUDIO_TOP + 114);
 
   /* ---- Right: house lights ---- */
   label(ctx, "House lights", COL_R, HOUSE_TOP + 20);
@@ -330,6 +366,16 @@ export function draw(ctx: CanvasRenderingContext2D, state: TabletState, hovered:
     );
   });
   slider(ctx, find("house:slider"), state.houseLights, hovered === "house:slider", AMBER);
+
+  const fogRegion = find("fog");
+  button(
+    ctx,
+    fogRegion,
+    state.fogActive ? "Fog: ON" : "Fog: OFF",
+    state.fogActive,
+    hovered === "fog",
+    TEAL,
+  );
 
   /* ---- Right: audio ---- */
   label(ctx, "Play through the PA", COL_R, AUDIO_TOP + 20);

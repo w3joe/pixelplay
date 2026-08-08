@@ -45,6 +45,9 @@ export function createDefaultConfig(): PlayConfig {
     },
     lighting: {
       package: "par_wash",
+      parCount: 2,
+      movingHeadCount: 3,
+      fogMachine: false,
     },
     extras: {
       photobooth: "none",
