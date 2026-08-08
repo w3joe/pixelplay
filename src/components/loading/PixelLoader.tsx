@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { PixelCanvasMatrix } from "@/components/loading/PixelCanvasMatrix";
-import { playPowerUp, playStepChime } from "@/lib/audio/pixelSynth";
+import {
+  isAudioMuted,
+  playPowerUp,
+  playStepChime,
+  startMusicLoop,
+  stopMusicLoop,
+  toggleAudioMuted,
+} from "@/lib/audio/pixelSynth";
 
 interface PixelLoaderProps {
   onComplete: () => void;
@@ -18,10 +25,20 @@ const LOADING_STATUSES = [
 export function PixelLoader({ onComplete }: PixelLoaderProps) {
   const [progress, setProgress] = useState(0);
   const [statusIdx, setStatusIdx] = useState(0);
+  const [muted, setMuted] = useState(false);
   const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    setMuted(isAudioMuted());
+    startMusicLoop();
+    return () => {
+      stopMusicLoop();
+    };
+  }, []);
 
   const handleStart = useCallback(() => {
     if (exiting) return;
+    stopMusicLoop();
     playPowerUp();
     setExiting(true);
     setTimeout(() => {
@@ -65,6 +82,14 @@ export function PixelLoader({ onComplete }: PixelLoaderProps) {
     return () => clearInterval(timer);
   }, [handleStart]);
 
+  const handleToggleMute = () => {
+    const isMuted = toggleAudioMuted();
+    setMuted(isMuted);
+    if (!isMuted) {
+      startMusicLoop();
+    }
+  };
+
   // Segmented pixel bar calculations
   const blockCount = 18;
   const filledBlocks = Math.floor((progress / 100) * blockCount);
@@ -80,6 +105,27 @@ export function PixelLoader({ onComplete }: PixelLoaderProps) {
 
       {/* CRT Scanline Overlay */}
       <div className="crt-overlay absolute inset-0 z-10" />
+
+      {/* Mute Audio Controls */}
+      <div className="absolute top-4 right-4 z-30">
+        <button
+          type="button"
+          onClick={handleToggleMute}
+          className="flex items-center gap-2 rounded-lg border border-teal-500/40 bg-slate-900/80 px-3 py-1.5 font-silkscreen text-[11px] text-slate-300 transition hover:border-[var(--accent)] hover:text-white backdrop-blur-md"
+        >
+          {muted ? (
+            <>
+              <span className="h-2 w-2 rounded-full bg-rose-500" />
+              <span>AUDIO: OFF</span>
+            </>
+          ) : (
+            <>
+              <span className="h-2 w-2 animate-ping rounded-full bg-[var(--accent)]" />
+              <span>AUDIO: ON</span>
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Center Pixel Content Card */}
       <main className="relative z-20 flex w-full max-w-md flex-col items-center justify-center p-6 text-center">

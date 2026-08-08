@@ -16,6 +16,24 @@ const METAL = { color: "#8b97a5", metalness: 0.85, roughness: 0.32 } as const;
 const DARK_METAL = { color: "#3b4654", metalness: 0.7, roughness: 0.38 } as const;
 const CABINET = { color: "#12181f", metalness: 0.25, roughness: 0.42 } as const;
 
+/* --------------------------------------------------------------- fixtures */
+
+/**
+ * Three's punctual lights are physical: intensity is candela and falls off as
+ * 1/d². These read against a key light of ~2 irradiance, so a fixture roughly
+ * 4m away needs intensity ≈ 2 × 4² ≈ 32 just to match it — show lights sit
+ * well above that so they actually punch through the house wash.
+ */
+const MOVER_ANGLE = 0.28; // ~16°, a tight profile beam
+const MOVER_BEAM_LEN = 5;
+const MOVER_INTENSITY = 240;
+
+const PAR_ANGLE = 0.5; // ~29°, a broad wash
+const PAR_BEAM_LEN = 5.5;
+const PAR_INTENSITY = 150;
+/** Cans stand downstage and tilt back toward the deck. */
+const PAR_TILT = -1;
+
 /** Deterministic 0..1 hash so crowd variation stays stable across renders. */
 function hash(i: number, salt = 0) {
   const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
@@ -484,13 +502,18 @@ function MovingHead({
   position,
   color,
   phase,
+  beamOpacity,
 }: {
   position: [number, number, number];
   color: string;
   phase: number;
+  beamOpacity: number;
 }) {
   const pan = useRef<Group>(null);
   const tilt = useRef<Group>(null);
+  // Parenting the aim point to the tilt group is what makes the spot actually
+  // track the head — three only honours light.target once it's in the graph.
+  const target = useMemo(() => new THREE.Object3D(), []);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
@@ -530,28 +553,57 @@ function MovingHead({
             <circleGeometry args={[0.085, 20]} />
             <meshBasicMaterial color={color} />
           </mesh>
-          {/* Beam cone — apex at the lens, widening downward */}
-          <mesh position={[0, -1.34, 0]}>
-            <coneGeometry args={[0.62, 2.3, 24, 1, true]} />
+          {/* Beam cone — apex at the lens, half-angle matched to MOVER_ANGLE so
+              the visible shaft and the lit pool agree. Depth-tested, so the
+              floor and stage clip it where it lands. */}
+          <mesh position={[0, -0.18 - MOVER_BEAM_LEN / 2, 0]}>
+            <coneGeometry
+              args={[Math.tan(MOVER_ANGLE) * MOVER_BEAM_LEN, MOVER_BEAM_LEN, 28, 1, true]}
+            />
             <meshBasicMaterial
               color={color}
               transparent
-              opacity={0.09}
+              opacity={beamOpacity}
               side={THREE.DoubleSide}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
             />
           </mesh>
-          {/* A point light tracks the head; a spotLight would need its target
-              added to the scene graph to aim correctly. */}
-          <pointLight position={[0, -0.9, 0]} intensity={1.6} color={color} distance={7} decay={2} />
+
+          <primitive object={target} position={[0, -20, 0]} />
+          <spotLight
+            target={target}
+            position={[0, -0.2, 0]}
+            angle={MOVER_ANGLE}
+            penumbra={0.55}
+            intensity={MOVER_INTENSITY}
+            distance={38}
+            decay={2}
+            color={color}
+            castShadow
+            shadow-mapSize-width={512}
+            shadow-mapSize-height={512}
+            shadow-bias={-0.001}
+            shadow-camera-near={0.5}
+            shadow-camera-far={40}
+          />
         </group>
       </group>
     </group>
   );
 }
 
-function ParCan({ position, color }: { position: [number, number, number]; color: string }) {
+function ParCan({
+  position,
+  color,
+  beamOpacity,
+}: {
+  position: [number, number, number];
+  color: string;
+  beamOpacity: number;
+}) {
+  const target = useMemo(() => new THREE.Object3D(), []);
+
   return (
     <group position={position}>
       <mesh position={[0, 0.72, 0]} castShadow>
@@ -567,15 +619,43 @@ function ParCan({ position, color }: { position: [number, number, number]; color
           </mesh>
         );
       })}
-      <mesh position={[0, 1.48, 0.04]} rotation={[0.42, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.13, 0.16, 0.3, 16]} />
-        <meshStandardMaterial color="#1a222c" metalness={0.45} roughness={0.35} />
-      </mesh>
-      <mesh position={[0, 1.42, 0.17]} rotation={[0.42 + Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.12, 20]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-      <pointLight position={[0, 1.6, 0.4]} intensity={1.1} color={color} distance={7} decay={2} />
+
+      {/* Lamp head. These stand downstage on the floor, so the can tilts back
+          and up to wash the stage — everything below emits along local +Y. */}
+      <group position={[0, 1.44, 0]} rotation={[PAR_TILT, 0, 0]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.15, 0.13, 0.3, 16]} />
+          <meshStandardMaterial color="#1a222c" metalness={0.45} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 0.155, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.14, 20]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+
+        <mesh position={[0, 0.16 + PAR_BEAM_LEN / 2, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[Math.tan(PAR_ANGLE) * PAR_BEAM_LEN, PAR_BEAM_LEN, 24, 1, true]} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={beamOpacity * 0.55}
+            side={THREE.DoubleSide}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+
+        <primitive object={target} position={[0, 20, 0]} />
+        <spotLight
+          target={target}
+          position={[0, 0.16, 0]}
+          angle={PAR_ANGLE}
+          penumbra={0.85}
+          intensity={PAR_INTENSITY}
+          distance={26}
+          decay={2}
+          color={color}
+        />
+      </group>
     </group>
   );
 }
@@ -586,12 +666,14 @@ function LightRig({
   stageWidth,
   stageZ,
   stageHeight,
+  beamOpacity,
 }: {
   packageType: PlayConfig["lighting"]["package"];
   stageLength: number;
   stageWidth: number;
   stageZ: number;
   stageHeight: number;
+  beamOpacity: number;
 }) {
   if (packageType === "none") return null;
   const showPar = packageType === "par_wash" || packageType === "both";
@@ -619,6 +701,7 @@ function LightRig({
               position={[barLength * t, y - 0.16, stageZ - 0.2]}
               color={i === 1 ? "#14d4b8" : "#6aa8ff"}
               phase={i * 2.1}
+              beamOpacity={beamOpacity}
             />
           ))}
         </>
@@ -632,6 +715,7 @@ function LightRig({
               // the stage footprint and they clip up through it.
               position={[stageLength * t * 0.75, 0, stageZ + stageWidth / 2 + 0.9]}
               color={i === 0 ? "#ffb347" : "#ff8fa3"}
+              beamOpacity={beamOpacity}
             />
           ))
         : null}
@@ -730,7 +814,7 @@ function Audience({
 }
 
 /** Vertical gradient backdrop — far nicer than a flat clear colour. */
-function Backdrop() {
+function Backdrop({ dim = 1 }: { dim?: number }) {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -739,6 +823,7 @@ function Backdrop() {
         uniforms: {
           uTop: { value: new THREE.Color("#e8eef6") },
           uBottom: { value: new THREE.Color("#b9c6d6") },
+          uDim: { value: 1 },
         },
         vertexShader: /* glsl */ `
           varying float vY;
@@ -751,14 +836,22 @@ function Backdrop() {
           varying float vY;
           uniform vec3 uTop;
           uniform vec3 uBottom;
+          uniform float uDim;
           void main() {
-            gl_FragColor = vec4(mix(uBottom, uTop, smoothstep(-0.25, 0.6, vY)), 1.0);
+            vec3 col = mix(uBottom, uTop, smoothstep(-0.25, 0.6, vY));
+            // Drop toward a cool near-black rather than grey as the house dims,
+            // so a blackout doesn't leave a bright halo around the room.
+            gl_FragColor = vec4(mix(vec3(0.012, 0.016, 0.026), col, uDim), 1.0);
             #include <colorspace_fragment>
           }
         `,
       }),
     [],
   );
+
+  useEffect(() => {
+    material.uniforms.uDim.value = dim;
+  }, [material, dim]);
 
   useEffect(() => () => material.dispose(), [material]);
 
@@ -904,6 +997,7 @@ export function VenueScene({
           stageWidth={stage.widthM}
           stageZ={stageZ}
           stageHeight={stage.heightM}
+          beamOpacity={lighting.package === "none" ? 0 : 0.22}
         />
 
         <Audience
