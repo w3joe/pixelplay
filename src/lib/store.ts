@@ -39,6 +39,7 @@ interface PlayStore {
   applyAudioSuggestions: () => void;
   setLighting: (patch: Partial<LightingConfig>) => void;
   setExtras: (patch: Partial<ExtrasConfig>) => void;
+  applyFullConfig: (config: PlayConfig) => void;
   setPreviewExpanded: (v: boolean) => void;
   setWalkMode: (v: boolean) => void;
 }
@@ -161,6 +162,10 @@ export const usePlayStore = create<PlayStore>((set, get) => ({
 
   setExtras: (patch) =>
     set((s) => ({ config: { ...s.config, extras: { ...s.config.extras, ...patch } } })),
+
+  // Wholesale replace, used by the AI planner agent — it builds a complete,
+  // rule-consistent PlayConfig server-side and hands it back in one shot.
+  applyFullConfig: (config) => set({ config }),
 
   setPreviewExpanded: (v) => set({ previewExpanded: v }),
 

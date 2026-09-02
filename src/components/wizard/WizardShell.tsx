@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState, useMemo } from "react";
 import { PixelLoader } from "@/components/loading/PixelLoader";
+import { AiPlannerCard } from "@/components/wizard/AiPlannerCard";
 import { CheckList } from "@/components/checks/CheckList";
 import { PriceRange } from "@/components/pricing/PriceRange";
 import { AudioStep } from "@/components/wizard/AudioStep";
@@ -233,6 +234,10 @@ export function WizardShell() {
 
       <div className="mx-auto grid max-w-[78rem] lg:grid-cols-[minmax(0,1fr)_400px]">
         <main className="order-2 px-4 pt-6 pb-28 sm:px-6 lg:order-1 lg:py-8 lg:pb-12">
+          <div className="mb-6">
+            <AiPlannerCard />
+          </div>
+
           <ProgressRail step={step} stepIdx={stepIdx} onSelect={setStep} />
 
           <div key={step} className="animate-step-in mt-8">

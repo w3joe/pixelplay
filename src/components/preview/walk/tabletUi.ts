@@ -342,7 +342,7 @@ export function draw(ctx: CanvasRenderingContext2D, state: TabletState, hovered:
   ctx.font = `500 20px ${FONT}`;
   ctx.fillText("WASD move · Shift run · Mouse look", COL_L, AUDIO_TOP + 54);
   ctx.fillStyle = INK;
-  ctx.fillText("E puts the tablet away", COL_L, AUDIO_TOP + 84);
+  ctx.fillText("Press E to toggle tablet", COL_L, AUDIO_TOP + 84);
   ctx.fillStyle = MUTED;
   ctx.fillText("Aim crosshair and click Exit to leave", COL_L, AUDIO_TOP + 114);
 

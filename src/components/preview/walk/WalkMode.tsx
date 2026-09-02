@@ -223,7 +223,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
             Controls
           </p>
           <p className="mt-1 text-xs text-white/70">
-            Press <span className="font-semibold text-white">E</span> for the tablet, then aim the
+            Press <span className="font-semibold text-white">E</span> to toggle tablet, then aim the
             crosshair and click
           </p>
         </Panel>
