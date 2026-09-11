@@ -28,8 +28,12 @@ Copy `.env.example` to `.env.local`:
 - `RESEND_API_KEY` — Resend API key
 - `LEADS_TO_EMAIL` — sales inbox
 - `LEADS_FROM_EMAIL` — verified Resend from address (optional; defaults to Resend onboarding)
+- `GEMINI_PROVIDER` — `developer` (Google AI Studio) or `vertex` (Vertex AI); default `developer`
+- `GEMINI_MODEL` — model id used by both providers (e.g. `gemini-3.1-flash-lite`)
+- `GEMINI_API_KEY` / `GOOGLE_API_KEY` — developer API key; also used as Vertex fallback
+- For Vertex: `VERTEX_API_KEY` (preferred), `VERTEX_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), `VERTEX_LOCATION` (or `GOOGLE_CLOUD_LOCATION`, default `us-central1`)
 
-Without Resend env vars, leads still appear in Vercel/server logs as `[pixelplay-lead]`.
+Without Resend env vars, leads still appear in Vercel/server logs as `[pixelplay-lead]`. Without Gemini credentials for the chosen provider, the AI planner card shows a not-configured message.
 
 ## Deploy (Vercel)
 

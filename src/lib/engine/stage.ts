@@ -1,4 +1,11 @@
-import type { CheckResult, PlayConfig, StageActivity, VenueKind } from "@/lib/types";
+import {
+  hasStageFootprint,
+  provideStage,
+  type CheckResult,
+  type PlayConfig,
+  type StageActivity,
+  type VenueKind,
+} from "@/lib/types";
 
 export function suggestStageLengthM(venueKind: VenueKind, venueLengthM: number): number {
   if (venueKind === "expo" || venueLengthM >= 30) return Math.min(12, Math.max(6, Math.round(venueLengthM * 0.35)));
@@ -15,6 +22,26 @@ export function suggestStageWidthM(activity: StageActivity): number {
 export function evaluateStage(config: PlayConfig): CheckResult[] {
   const checks: CheckResult[] = [];
   const { stage, venue } = config;
+
+  if (!hasStageFootprint(stage)) {
+    checks.push({
+      id: "stage-none",
+      category: "stage",
+      status: "info",
+      message: "No stage in this plan — LED height is measured from the floor with a 30cm safety gap.",
+    });
+    return checks;
+  }
+
+  if (stage.existing && !stage.needed) {
+    checks.push({
+      id: "stage-existing",
+      category: "stage",
+      status: "info",
+      message: "Using the venue's existing stage — no stage rental in this quote.",
+    });
+  }
+
   const suggestedL = suggestStageLengthM(venue.kind, venue.lengthM);
   const suggestedW = suggestStageWidthM(stage.activity);
 
@@ -70,12 +97,14 @@ export function evaluateStage(config: PlayConfig): CheckResult[] {
     });
   }
 
-  checks.push({
-    id: "stage-budget",
-    category: "stage",
-    status: "info",
-    message: "Stage platforms typically run around ~$100/sqm/day depending on height, vendor, and skirting.",
-  });
+  if (provideStage(stage)) {
+    checks.push({
+      id: "stage-budget",
+      category: "stage",
+      status: "info",
+      message: "Stage platforms typically run around ~$100/sqm/day depending on height, vendor, and skirting.",
+    });
+  }
 
   return checks;
 }

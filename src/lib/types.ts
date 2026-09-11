@@ -6,7 +6,8 @@ export type VenueKind =
   | "outdoor_tented"
   | "outdoor_open";
 
-export type PowerCapacity = "light" | "medium" | "heavy" | "generator";
+/** Client-facing power answers — not technical circuit ratings. */
+export type PowerCapacity = "unsure" | "venue_provides" | "need_db" | "generator";
 
 export type EventType =
   | "corporate_launch"
@@ -21,7 +22,7 @@ export type ScreenType = "indoor_led" | "outdoor_led" | "projector";
 
 export type LightingPackage = "none" | "par_wash" | "moving_heads" | "both";
 
-export type PhotoboothType = "none" | "roving" | "traditional";
+export type PhotoboothType = "none" | "roving" | "traditional" | "polaroid";
 
 export type CheckStatus = "pass" | "warn" | "fail" | "info";
 
@@ -47,6 +48,7 @@ export interface VenuePreset {
   power: PowerCapacity;
   powerNote: string;
   inHouseAudioLikely: boolean;
+  inHouseScreenLikely: boolean;
 }
 
 export interface VenueConfig {
@@ -61,6 +63,7 @@ export interface VenueConfig {
   power: PowerCapacity;
   powerNote: string;
   inHouseAudio: boolean;
+  inHouseScreen: boolean;
 }
 
 export interface EventConfig {
@@ -72,6 +75,10 @@ export interface EventConfig {
 }
 
 export interface StageConfig {
+  /** Venue already has a stage we can use. */
+  existing: boolean;
+  /** PixelPro should provide / build a stage. */
+  needed: boolean;
   lengthM: number;
   widthM: number;
   heightM: number;
@@ -80,6 +87,8 @@ export interface StageConfig {
 }
 
 export interface ScreenConfig {
+  /** false = skip LED/screen rental (venue screens / not needed). */
+  needed: boolean;
   type: ScreenType;
   widthM: number;
   heightM: number;
@@ -88,8 +97,13 @@ export interface ScreenConfig {
 export interface AudioConfig {
   speakerCount: number;
   subwooferCount: number;
-  micCount: number;
+  handheldCount: number;
+  headsetCount: number;
+  rostrumCount: number;
   useRecommendedBrand: boolean;
+  /** Simultaneous instrument DIs for live band. Null when not a band event. */
+  bandInputs: number | null;
+  bandInputsUnsure: boolean;
 }
 
 export interface LightingConfig {
@@ -158,6 +172,32 @@ export const STEP_LABELS: Record<WizardStep, string> = {
   screen: "LED / Screen",
   audio: "Audio",
   lighting: "Lighting",
-  extras: "Extras",
+  extras: "Photobooth",
   summary: "Summary",
 };
+
+export function totalMicCount(audio: AudioConfig): number {
+  return audio.handheldCount + audio.headsetCount + audio.rostrumCount;
+}
+
+/** PixelPro supplies a stage (rental line). */
+export function provideStage(stage: StageConfig): boolean {
+  return stage.needed && !stage.existing;
+}
+
+/** There is a physical stage footprint for LED / sightline math. */
+export function hasStageFootprint(stage: StageConfig): boolean {
+  return stage.existing || stage.needed;
+}
+
+export function effectiveStageHeightM(stage: StageConfig): number {
+  return hasStageFootprint(stage) ? stage.heightM : 0;
+}
+
+export function wantsScreenRental(screen: ScreenConfig): boolean {
+  return screen.needed;
+}
+
+export function isLiveBandEvent(config: PlayConfig): boolean {
+  return config.event.type === "live_band_dj" || config.stage.activity === "band";
+}

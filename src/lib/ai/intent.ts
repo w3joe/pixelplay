@@ -58,11 +58,16 @@ const VENUE_KINDS: VenueKind[] = [
   "outdoor_tented",
   "outdoor_open",
 ];
-const POWER_CAPACITIES: PowerCapacity[] = ["light", "medium", "heavy", "generator"];
+const POWER_CAPACITIES: PowerCapacity[] = ["unsure", "venue_provides", "need_db", "generator"];
+const LEGACY_POWER: Record<string, PowerCapacity> = {
+  light: "unsure",
+  medium: "venue_provides",
+  heavy: "venue_provides",
+};
 const STAGE_ACTIVITIES: StageActivity[] = ["emcee", "awards", "dance", "band"];
 const SCREEN_TYPES: ScreenType[] = ["indoor_led", "outdoor_led", "projector"];
 const LIGHTING_PACKAGES: LightingPackage[] = ["none", "par_wash", "moving_heads", "both"];
-const PHOTOBOOTH_TYPES: PhotoboothType[] = ["none", "roving", "traditional"];
+const PHOTOBOOTH_TYPES: PhotoboothType[] = ["none", "roving", "traditional", "polaroid"];
 const LIBRARY_VENUE_IDS = SINGAPORE_VENUES.map((v) => v.id);
 
 /** Gemini's structured-output schema (OpenAPI 3.0 subset, as required by the API). */
@@ -170,8 +175,14 @@ export function validateIntent(raw: unknown): EventIntent | null {
   if (libraryId !== null && !LIBRARY_VENUE_IDS.includes(libraryId as string)) return null;
   const manualKind = v.manualKind ?? null;
   if (!isNullableOneOf(manualKind, VENUE_KINDS)) return null;
-  const manualPower = v.manualPower ?? null;
-  if (!isNullableOneOf(manualPower, POWER_CAPACITIES)) return null;
+  const rawPower = v.manualPower ?? null;
+  const manualPower =
+    rawPower === null
+      ? null
+      : isOneOf(rawPower, POWER_CAPACITIES)
+        ? rawPower
+        : LEGACY_POWER[rawPower as string] ?? null;
+  if (rawPower !== null && manualPower === null) return null;
   const manualAreaSqft = v.manualAreaSqft ?? null;
   const manualLengthM = v.manualLengthM ?? null;
   const manualDepthM = v.manualDepthM ?? null;

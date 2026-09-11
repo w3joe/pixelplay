@@ -1,4 +1,4 @@
-import type { CheckResult, PlayConfig } from "@/lib/types";
+import { totalMicCount, type CheckResult, type PlayConfig } from "@/lib/types";
 
 export function evaluateLighting(config: PlayConfig): CheckResult[] {
   const checks: CheckResult[] = [];
@@ -44,7 +44,6 @@ export function evaluateLighting(config: PlayConfig): CheckResult[] {
         status: "info",
         message: `${n}× moving head${n > 1 ? "s" : ""} engage the audience with motion but need truss — expect additional structure cost.`,
       });
-      // Roughly half a metre of truss per fixture before they start colliding.
       const span = Math.max(config.stage.lengthM * 0.92, 2.5);
       if (n * 0.55 > span) {
         checks.push({
@@ -63,6 +62,7 @@ export function evaluateLighting(config: PlayConfig): CheckResult[] {
 
 export function evaluateMics(config: PlayConfig): CheckResult[] {
   const checks: CheckResult[] = [];
+  const total = totalMicCount(config.audio);
 
   if (config.event.highStakes) {
     checks.push({
@@ -83,12 +83,25 @@ export function evaluateMics(config: PlayConfig): CheckResult[] {
     });
   }
 
-  if (config.audio.micCount < 2 && config.event.type !== "speech_ceremony") {
+  if (total < 2 && config.event.type !== "speech_ceremony") {
     checks.push({
       id: "mics-count",
       category: "mics",
       status: "warn",
-      message: "Most events need at least 2 wireless mics (host + guest / backup).",
+      message: "Most events need at least 2 mics (host + guest / backup).",
+    });
+  }
+
+  const parts: string[] = [];
+  if (config.audio.handheldCount) parts.push(`${config.audio.handheldCount}× handheld`);
+  if (config.audio.headsetCount) parts.push(`${config.audio.headsetCount}× headset`);
+  if (config.audio.rostrumCount) parts.push(`${config.audio.rostrumCount}× rostrum`);
+  if (parts.length) {
+    checks.push({
+      id: "mics-mix",
+      category: "mics",
+      status: "info",
+      message: `Mic mix: ${parts.join(", ")}.`,
     });
   }
 
@@ -97,15 +110,18 @@ export function evaluateMics(config: PlayConfig): CheckResult[] {
 
 export function evaluateExtras(config: PlayConfig): CheckResult[] {
   if (config.extras.photobooth === "none") return [];
+  const message =
+    config.extras.photobooth === "roving"
+      ? "Roving photobooth: photographer circulates with instant prints — great for mingling."
+      : config.extras.photobooth === "polaroid"
+        ? "Polaroid camera: a light, roaming take-home — guests shoot and keep the print."
+        : "Traditional photobooth: props + themed backdrop for a memorable takeaway.";
   return [
     {
       id: "photobooth",
       category: "general",
       status: "info",
-      message:
-        config.extras.photobooth === "roving"
-          ? "Roving photobooth: photographer circulates with instant prints — great for mingling."
-          : "Traditional photobooth: props + themed backdrop for a memorable takeaway.",
+      message,
     },
   ];
 }

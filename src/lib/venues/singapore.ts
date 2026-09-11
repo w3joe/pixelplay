@@ -9,9 +9,10 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     lengthM: 30,
     depthM: 25,
     ceilingM: 7,
-    power: "heavy",
+    power: "venue_provides",
     powerNote: "High load available; coordinate power with venue engineering.",
     inHouseAudioLikely: true,
+    inHouseScreenLikely: true,
   },
   {
     id: "rws-ballroom",
@@ -21,9 +22,10 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     lengthM: 28,
     depthM: 20,
     ceilingM: 6,
-    power: "heavy",
+    power: "venue_provides",
     powerNote: "In-house AV often available — confirm before bringing full PA.",
     inHouseAudioLikely: true,
+    inHouseScreenLikely: true,
   },
   {
     id: "suntec-hall",
@@ -33,9 +35,10 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     lengthM: 40,
     depthM: 30,
     ceilingM: 8,
-    power: "heavy",
+    power: "venue_provides",
     powerNote: "High power and truck access typical for expo halls.",
     inHouseAudioLikely: false,
+    inHouseScreenLikely: false,
   },
   {
     id: "orchard-wedding",
@@ -45,9 +48,10 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     lengthM: 18,
     depthM: 13,
     ceilingM: 4,
-    power: "medium",
+    power: "venue_provides",
     powerNote: "Often has in-house audio — ask before deploying external PA.",
     inHouseAudioLikely: true,
+    inHouseScreenLikely: true,
   },
   {
     id: "community-hall",
@@ -57,9 +61,10 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     lengthM: 20,
     depthM: 14,
     ceilingM: 4.5,
-    power: "light",
-    powerNote: "Limited circuits — plan loads carefully.",
+    power: "unsure",
+    powerNote: "CC halls vary — many need a temporary DB if the house circuits are light.",
     inHouseAudioLikely: false,
+    inHouseScreenLikely: false,
   },
   {
     id: "school-mph",
@@ -69,9 +74,10 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     lengthM: 24,
     depthM: 15,
     ceilingM: 6,
-    power: "medium",
+    power: "unsure",
     powerNote: "Typical school power limits; confirm distribution boards.",
     inHouseAudioLikely: false,
+    inHouseScreenLikely: true,
   },
   {
     id: "tented-outdoor",
@@ -84,6 +90,7 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     power: "generator",
     powerNote: "Generator often required for tented outdoor events.",
     inHouseAudioLikely: false,
+    inHouseScreenLikely: false,
   },
   {
     id: "open-field",
@@ -96,6 +103,7 @@ export const SINGAPORE_VENUES: VenuePreset[] = [
     power: "generator",
     powerNote: "Generator + weather plan required; outdoor LED for daytime.",
     inHouseAudioLikely: false,
+    inHouseScreenLikely: false,
   },
 ];
 

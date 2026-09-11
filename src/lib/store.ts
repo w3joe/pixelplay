@@ -16,7 +16,7 @@ import type {
   VenueConfig,
   WizardStep,
 } from "@/lib/types";
-import { WIZARD_STEPS } from "@/lib/types";
+import { WIZARD_STEPS, effectiveStageHeightM } from "@/lib/types";
 import { create } from "zustand";
 
 interface PlayStore {
@@ -83,6 +83,11 @@ export const usePlayStore = create<PlayStore>((set, get) => ({
           power: v.power,
           powerNote: v.powerNote,
           inHouseAudio: v.inHouseAudioLikely,
+          inHouseScreen: v.inHouseScreenLikely,
+        },
+        screen: {
+          ...s.config.screen,
+          needed: !v.inHouseScreenLikely,
         },
       },
     }));
@@ -126,7 +131,7 @@ export const usePlayStore = create<PlayStore>((set, get) => ({
 
   clampScreenToSafeHeight: () => {
     const { venue, stage, screen } = get().config;
-    const maxH = maxLedHeightM(venue.ceilingM, stage.heightM);
+    const maxH = maxLedHeightM(venue.ceilingM, effectiveStageHeightM(stage));
     if (maxH != null && screen.heightM > maxH) {
       set((s) => ({
         config: { ...s.config, screen: { ...s.config.screen, heightM: maxH } },

@@ -1,7 +1,9 @@
 /** Indicative Singapore market ballpark rates (SGD / day). Non-binding. */
 
 export const RATES = {
-  indoorLedPerSqm: { low: 180, high: 350 },
+  // PixelPro indoor LED is not a $180/sqm commodity wall — 4×2m should not
+  // land around $1.4k. Calibrated so a 3×2 is ~$1.9k–$3.1k and a 4×2 is ~$2.6k–$4.2k.
+  indoorLedPerSqm: { low: 320, high: 520 },
   outdoorLedMultiplier: { low: 1.3, high: 1.5 },
   engineerEndorsement: { low: 500, high: 800 },
   projectorPackage: { low: 300, high: 800 },
@@ -22,7 +24,11 @@ export const RATES = {
   movingHeadTrussBase: { low: 260, high: 850 },
   fogMachine: { low: 150, high: 350 },
   photobooth: { low: 600, high: 1200 },
-  micExtraEach: { low: 40, high: 80 },
+  polaroid: { low: 250, high: 450 },
+  micEach: { low: 40, high: 80 },
+  mixer24: { low: 180, high: 350 },
+  mixer32: { low: 280, high: 520 },
+  mixer48Stagebox: { low: 650, high: 1200 },
 } as const;
 
 export const PRICE_DISCLAIMER =
@@ -41,8 +47,8 @@ export const POWER_DRAW_W = {
 } as const;
 
 export const POWER_CAPACITY_W: Record<string, number> = {
-  light: 3000,
-  medium: 8000,
-  heavy: 20000,
+  unsure: 8000,
+  venue_provides: 12000,
+  need_db: 15000,
   generator: 15000,
 };

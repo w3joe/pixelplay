@@ -28,9 +28,28 @@ describe("recommendSpeakerCount", () => {
     expect(recommendSpeakerCount(c)).toBe(2);
   });
 
-  it("bumps to 4 when indoor area >= 2000 sqft", () => {
+  it("keeps 2 speakers for a 3000 sqft CC multipurpose speech event", () => {
     const c = createDefaultConfig();
     c.venue.kind = "multipurpose";
+    c.venue.areaSqft = 3000;
+    c.event.type = "corporate_launch";
+    c.event.pax = 150;
+    expect(recommendSpeakerCount(c)).toBe(2);
+  });
+
+  it("suggests 2–4 for MPH live band, typical 4 when pax is high", () => {
+    const c = createDefaultConfig();
+    c.venue.kind = "multipurpose";
+    c.venue.areaSqft = 3000;
+    c.event.type = "live_band_dj";
+    c.event.pax = 250;
+    c.stage.activity = "band";
+    expect(recommendSpeakerCount(c)).toBe(4);
+  });
+
+  it("bumps ballrooms to 4 when indoor area >= 2000 sqft", () => {
+    const c = createDefaultConfig();
+    c.venue.kind = "ballroom";
     c.venue.areaSqft = 2500;
     c.event.type = "corporate_launch";
     c.event.pax = 150;
@@ -60,6 +79,7 @@ describe("runSufficiencyEngine", () => {
     const c = createDefaultConfig();
     c.venue.ceilingM = 3;
     c.stage.heightM = 0.6;
+    c.screen.needed = true;
     c.screen.heightM = 2.5;
     const results = runSufficiencyEngine(c);
     expect(results.some((r) => r.id === "led-height-exceed" && r.status === "fail")).toBe(true);
@@ -70,8 +90,25 @@ describe("runSufficiencyEngine", () => {
     c.venue.kind = "outdoor_open";
     c.event.daytimeOutdoor = true;
     c.event.type = "outdoor_fow";
+    c.screen.needed = true;
     c.screen.type = "indoor_led";
     const results = runSufficiencyEngine(c);
     expect(results.some((r) => r.id === "led-outdoor-brightness")).toBe(true);
+  });
+
+  it("warns when LED is wider than the stage", () => {
+    const c = createDefaultConfig();
+    c.stage.needed = true;
+    c.stage.lengthM = 4;
+    c.screen.needed = true;
+    c.screen.widthM = 6;
+    const results = runSufficiencyEngine(c);
+    expect(results.some((r) => r.id === "led-wider-than-stage" && r.status === "warn")).toBe(true);
+  });
+
+  it("does not surface power-draw warnings", () => {
+    const c = createDefaultConfig();
+    const results = runSufficiencyEngine(c);
+    expect(results.some((r) => r.category === "power")).toBe(false);
   });
 });

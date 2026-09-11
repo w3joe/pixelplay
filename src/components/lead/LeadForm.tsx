@@ -16,10 +16,10 @@ export function LeadForm() {
   const [eventDate, setEventDate] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [quoted, setQuoted] = useState(false);
   const [error, setError] = useState("");
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(wantQuote: boolean) {
     setStatus("loading");
     setError("");
 
@@ -38,6 +38,7 @@ export function LeadForm() {
           company,
           eventDate,
           notes,
+          wantQuote,
           config,
           checks,
           price,
@@ -48,11 +49,17 @@ export function LeadForm() {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error || "Failed to send");
       }
+      setQuoted(wantQuote);
       setStatus("ok");
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong");
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void submit(false);
   }
 
   if (status === "ok") {
@@ -63,11 +70,12 @@ export function LeadForm() {
         </span>
         <div>
           <p className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
-            Plan sent to PixelPro
+            {quoted ? "Plan emailed — quote requested" : "Plan emailed to you"}
           </p>
           <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">
-            We logged your PixelPlay spec and emailed the team. Someone will follow up with a proper
-            quote.
+            {quoted
+              ? "Check your inbox for the write-up. PixelPro will follow up with a proper quote."
+              : "Check your inbox for the write-up. Tap below any time if you want PixelPro to quote."}
           </p>
         </div>
       </div>
@@ -78,10 +86,10 @@ export function LeadForm() {
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
         <h3 className="font-display text-xl font-bold tracking-tight text-[var(--ink)]">
-          Send this plan to PixelPro
+          Send this event plan to me
         </h3>
         <p className="mt-1.5 text-sm text-[var(--ink-muted)]">
-          Share your contact details and we&apos;ll receive the full generated spec.
+          We&apos;ll email you the generated spec. Ask for a quote only if you want PixelPro to follow up.
         </p>
       </div>
 
@@ -145,9 +153,20 @@ export function LeadForm() {
         </p>
       ) : null}
 
-      <Button type="submit" disabled={status === "loading"} className="w-full sm:w-auto">
-        {status === "loading" ? "Sending…" : "Send plan to PixelPro"}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button type="submit" disabled={status === "loading"} className="w-full sm:w-auto">
+          {status === "loading" ? "Sending…" : "Send this event plan to me"}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={status === "loading"}
+          className="w-full sm:w-auto"
+          onClick={() => void submit(true)}
+        >
+          I wish to get a quote too!!
+        </Button>
+      </div>
     </form>
   );
 }

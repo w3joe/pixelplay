@@ -4,6 +4,7 @@ import { ContactShadows, Environment, OrbitControls, RoundedBox } from "@react-t
 import { useFrame, useThree } from "@react-three/fiber";
 import { computeVenueLayout, type Vec3 } from "@/lib/layout";
 import type { PlayConfig } from "@/lib/types";
+import { effectiveStageHeightM, hasStageFootprint, wantsScreenRental } from "@/lib/types";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import type { Group } from "three";
 import * as THREE from "three";
@@ -359,27 +360,7 @@ function LedWall({
 
   return (
     <group position={[0, y, z]}>
-      {!isProj ? (
-        <>
-          {/* Ground-support towers and header truss */}
-          {[-1, 1].map((s) => (
-            <group key={s} position={[(s * (widthM + 0.34)) / 2, heightM / 2, 0]}>
-              <group rotation={[0, 0, Math.PI / 2]}>
-                <Truss length={heightM + 0.5} depth={0.1} />
-              </group>
-              <mesh position={[0, -heightM / 2 - 0.2, 0]} castShadow>
-                <boxGeometry args={[0.5, 0.08, 0.7]} />
-                <meshStandardMaterial {...DARK_METAL} />
-              </mesh>
-            </group>
-          ))}
-          <group position={[0, heightM + 0.32, 0]}>
-            <Truss length={widthM + 0.7} depth={0.1} />
-          </group>
-        </>
-      ) : null}
-
-      {/* Cabinet frame behind the panel */}
+      {/* Cabinet frame behind the panel — no flying truss */}
       <RoundedBox
         args={[widthM + 0.18, heightM + 0.18, 0.16]}
         radius={safeRadius([widthM, heightM, 0.16], 0.03)}
@@ -410,13 +391,9 @@ function LedWall({
 
       {!isProj ? (
         <pointLight
-          // Candela, not a 0-1 dial: at ~3m this is what it takes for a wall
-          // this size to visibly throw colour onto the stage and performers.
           position={[0, heightM * 0.55, 1.4]}
           intensity={isOutdoor ? 80 : 48}
           color={spill}
-          // Kept short: a wall this size lights the stage and the front rows,
-          // it does not wash the whole hall teal.
           distance={15}
           decay={2}
         />
@@ -1193,21 +1170,25 @@ export function VenueScene({
         <Floor lengthM={L} depthM={D} />
         <Walls lengthM={L} depthM={D} ceilingM={venue.ceilingM} />
 
-        <StageMesh
-          lengthM={stage.lengthM}
-          widthM={stage.widthM}
-          heightM={stage.heightM}
-          shape={stage.shape}
-          stageZ={stageZ}
-        />
+        {hasStageFootprint(stage) ? (
+          <StageMesh
+            lengthM={stage.lengthM}
+            widthM={stage.widthM}
+            heightM={stage.heightM}
+            shape={stage.shape}
+            stageZ={stageZ}
+          />
+        ) : null}
 
-        <LedWall
-          widthM={screen.widthM}
-          heightM={screen.heightM}
-          type={screen.type}
-          y={stage.heightM}
-          z={stageZ - stage.widthM / 2 + 0.1}
-        />
+        {wantsScreenRental(screen) ? (
+          <LedWall
+            widthM={screen.widthM}
+            heightM={screen.heightM}
+            type={screen.type}
+            y={effectiveStageHeightM(stage)}
+            z={stageZ - (hasStageFootprint(stage) ? stage.widthM / 2 : 0) + 0.1}
+          />
+        ) : null}
 
         {speakers.map((p, i) => (
           <Speaker key={`spk-${i}`} position={p} />

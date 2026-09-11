@@ -48,7 +48,7 @@ export function SummaryStep() {
       <SectionTitle
         eyebrow="Step 8 · Review"
         title="Your PixelPlay plan"
-        subtitle="Review checks and the indicative range, then send it to PixelPro."
+        subtitle="A working plan you can email to yourself — and ask PixelPro to quote when you're ready."
       />
 
       <section className="card overflow-hidden">
@@ -60,8 +60,16 @@ export function SummaryStep() {
           />
           <Stat
             label="Kit snapshot"
-            value={`${config.screen.widthM}×${config.screen.heightM}m ${SCREEN_LABELS[config.screen.type]}`}
-            sub={`${config.audio.speakerCount}× 15″ PA · stage ${config.stage.lengthM}×${config.stage.widthM}m`}
+            value={
+              config.screen.needed
+                ? `${config.screen.widthM}×${config.screen.heightM}m ${SCREEN_LABELS[config.screen.type]}`
+                : "Venue screens / no LED rental"
+            }
+            sub={`${config.audio.speakerCount}× 15″ PA · ${
+              config.stage.existing || config.stage.needed
+                ? `stage ${config.stage.lengthM}×${config.stage.widthM}m`
+                : "no stage"
+            }`}
           />
         </div>
         <div className="flex items-center justify-between gap-3 p-4">

@@ -18,6 +18,7 @@ import type {
   StageConfig,
   VenueConfig,
 } from "@/lib/types";
+import { totalMicCount } from "@/lib/types";
 import type { EventIntent } from "@/lib/ai/intent";
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -47,6 +48,7 @@ function buildVenue(intent: EventIntent): VenueConfig {
         power: preset.power,
         powerNote: preset.powerNote,
         inHouseAudio: preset.inHouseAudioLikely,
+        inHouseScreen: preset.inHouseScreenLikely,
       };
     }
   }
@@ -61,9 +63,10 @@ function buildVenue(intent: EventIntent): VenueConfig {
     lengthM: m.manualLengthM ?? 20,
     depthM: m.manualDepthM ?? 14,
     ceilingM: m.manualCeilingM ?? 4.5,
-    power: m.manualPower ?? "medium",
+    power: m.manualPower ?? "unsure",
     powerNote: "Manual venue entered by AI planner — confirm power on site survey.",
     inHouseAudio: false,
+    inHouseScreen: false,
   };
 }
 
@@ -88,7 +91,7 @@ function buildStage(intent: EventIntent, venue: VenueConfig, event: EventConfig)
     event.type === "wedding" && (venue.kind === "ballroom" || venue.kind === "wedding_ballroom")
       ? "t_shape"
       : "rectangle";
-  return { lengthM, widthM, heightM, activity, shape };
+  return { lengthM, widthM, heightM, activity, shape, existing: false, needed: true };
 }
 
 /** Mirrors the condition evaluateLed() uses for its hard "led-outdoor-brightness" fail. */
@@ -108,7 +111,7 @@ function buildScreen(
   if (outdoorRequired && type === "indoor_led") type = "outdoor_led";
 
   if (type === "projector") {
-    return { type, widthM: 4, heightM: 2.25 };
+    return { needed: true, type, widthM: 4, heightM: 2.25 };
   }
 
   // Match evaluateLed()'s own "pass" bands: on a small stage, width ~= stage
@@ -120,7 +123,7 @@ function buildScreen(
   const floor = maxH != null ? Math.min(1.5, maxH) : 1.5;
   heightM = Math.max(heightM, floor);
 
-  return { type, widthM, heightM };
+  return { needed: !venue.inHouseScreen || intent.screenType != null, type, widthM, heightM };
 }
 
 function recommendMicCount(intent: EventIntent): number {
@@ -136,13 +139,22 @@ function buildAudio(intent: EventIntent, base: PlayConfig): AudioConfig {
     ...base,
     audio: { ...base.audio, speakerCount },
   });
-  const micCount = clamp(
+  const useRecommendedBrand = intent.event.highStakes ? true : !intent.budgetBrandOk;
+  const handheldCount = clamp(
     Math.round(intent.micCountPreference ?? recommendMicCount(intent)),
-    1,
+    0,
     8,
   );
-  const useRecommendedBrand = intent.event.highStakes ? true : !intent.budgetBrandOk;
-  return { speakerCount, subwooferCount, micCount, useRecommendedBrand };
+  return {
+    speakerCount,
+    subwooferCount,
+    handheldCount: Math.max(handheldCount, 1),
+    headsetCount: intent.event.highStakes ? 1 : 0,
+    rostrumCount: intent.event.type === "speech_ceremony" ? 1 : 0,
+    useRecommendedBrand,
+    bandInputs: intent.event.type === "live_band_dj" ? null : null,
+    bandInputsUnsure: intent.event.type === "live_band_dj",
+  };
 }
 
 function defaultLightingPackage(intent: EventIntent): LightingPackage {
@@ -189,7 +201,16 @@ export function buildConfigFromIntent(intent: EventIntent): PlayConfig {
     event,
     stage,
     screen,
-    audio: { speakerCount: 2, subwooferCount: 0, micCount: 2, useRecommendedBrand: true },
+    audio: {
+      speakerCount: 2,
+      subwooferCount: 0,
+      handheldCount: 2,
+      headsetCount: 0,
+      rostrumCount: 0,
+      useRecommendedBrand: true,
+      bandInputs: null,
+      bandInputsUnsure: false,
+    },
     lighting: { package: "none", parCount: 0, movingHeadCount: 0, fogMachine: false },
     extras: { photobooth: "none" },
   };
@@ -295,8 +316,11 @@ export function computeBudgetFit(config: PlayConfig, budgetSgd: number | null): 
   if (fits()) return { config: current, cuts, stillOverBudget: false };
 
   // 5. Trim mics down to the floor the sufficiency engine checks for.
-  if (current.audio.micCount > 2) {
-    current = { ...current, audio: { ...current.audio, micCount: 2 } };
+  if (totalMicCount(current.audio) > 2) {
+    current = {
+      ...current,
+      audio: { ...current.audio, handheldCount: 2, headsetCount: 0, rostrumCount: 0 },
+    };
     cuts.push("Reduced wireless mics to 2");
   }
   if (fits()) return { config: current, cuts, stillOverBudget: false };

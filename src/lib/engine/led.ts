@@ -1,4 +1,10 @@
-import type { CheckResult, PlayConfig } from "@/lib/types";
+import {
+  effectiveStageHeightM,
+  hasStageFootprint,
+  wantsScreenRental,
+  type CheckResult,
+  type PlayConfig,
+} from "@/lib/types";
 
 /** Max LED height: ceiling − stage − 30cm safety, snapped down to 0.5m. */
 export function maxLedHeightM(ceilingM: number | null, stageHeightM: number): number | null {
@@ -15,7 +21,21 @@ export function snapHalfMeter(value: number): number {
 export function evaluateLed(config: PlayConfig): CheckResult[] {
   const checks: CheckResult[] = [];
   const { venue, stage, screen, event } = config;
-  const maxH = maxLedHeightM(venue.ceilingM, stage.heightM);
+
+  if (!wantsScreenRental(screen)) {
+    checks.push({
+      id: "led-skipped",
+      category: "led",
+      status: "info",
+      message: venue.inHouseScreen
+        ? "Using the venue's in-house screens — no PixelPro LED rental in this plan."
+        : "No LED / screen rental in this plan.",
+    });
+    return checks;
+  }
+
+  const stageH = effectiveStageHeightM(stage);
+  const maxH = maxLedHeightM(venue.ceilingM, stageH);
 
   if (screen.type === "projector") {
     checks.push({
@@ -33,7 +53,7 @@ export function evaluateLed(config: PlayConfig): CheckResult[] {
         id: "led-height-exceed",
         category: "led",
         status: "fail",
-        message: `LED height ${screen.heightM}m exceeds safe max ${maxH}m for this ceiling (${venue.ceilingM}m) and stage (${stage.heightM}m) with 30cm clearance.`,
+        message: `LED height ${screen.heightM}m exceeds safe max ${maxH}m for this ceiling (${venue.ceilingM}m) and stage (${stageH}m) with 30cm clearance.`,
         suggested: `Reduce LED height to ${maxH}m or lower the stage.`,
       });
     } else {
@@ -41,7 +61,7 @@ export function evaluateLed(config: PlayConfig): CheckResult[] {
         id: "led-height-ok",
         category: "led",
         status: "pass",
-        message: `LED height ${screen.heightM}m is within the safe max of ${maxH}m for this venue.`,
+        message: `LED height ${screen.heightM}m is within the safe max of ${maxH}m (ceiling − stage − 0.3m).`,
       });
     }
   } else if (screen.type !== "projector") {
@@ -53,42 +73,52 @@ export function evaluateLed(config: PlayConfig): CheckResult[] {
     });
   }
 
-  const stageLen = stage.lengthM;
-  const ledW = screen.widthM;
-  const shortfall = stageLen - ledW;
+  if (hasStageFootprint(stage) && screen.type !== "projector") {
+    const stageLen = stage.lengthM;
+    const ledW = screen.widthM;
+    const shortfall = stageLen - ledW;
 
-  if (stageLen <= 5) {
-    if (shortfall > 0.25) {
+    if (ledW > stageLen + 0.05) {
       checks.push({
-        id: "led-width-small-stage",
+        id: "led-wider-than-stage",
         category: "led",
         status: "warn",
-        message: `On a small ${stageLen}m stage, an LED shorter than the stage often looks incomplete. Aim for ~${stageLen}m width.`,
-        suggested: `Set LED width to ${stageLen}m.`,
+        message: `LED width ${ledW}m is wider than the ${stageLen}m stage — it will overhang and can look awkward.`,
+        suggested: `Bring LED width down to ${stageLen}m or widen the stage.`,
       });
-    } else {
+    } else if (stageLen <= 5) {
+      if (shortfall > 0.25) {
+        checks.push({
+          id: "led-width-small-stage",
+          category: "led",
+          status: "warn",
+          message: `On a small ${stageLen}m stage, an LED shorter than the stage often looks incomplete. Aim for ~${stageLen}m width.`,
+          suggested: `Set LED width to ${stageLen}m.`,
+        });
+      } else {
+        checks.push({
+          id: "led-width-small-ok",
+          category: "led",
+          status: "pass",
+          message: "LED width matches the small stage well.",
+        });
+      }
+    } else if (shortfall > 2.5) {
       checks.push({
-        id: "led-width-small-ok",
+        id: "led-width-large-short",
+        category: "led",
+        status: "warn",
+        message: `For a ${stageLen}m stage, LED ${ledW}m is more than ~2m shorter — it may look underwhelming.`,
+        suggested: `Consider ${Math.max(stageLen - 2, ledW)}m–${stageLen}m LED width.`,
+      });
+    } else if (shortfall >= 0 && shortfall <= 2) {
+      checks.push({
+        id: "led-width-large-ok",
         category: "led",
         status: "pass",
-        message: "LED width matches the small stage well.",
+        message: "On a large stage, LED 1–2m shorter than stage length is usually fine.",
       });
     }
-  } else if (shortfall > 2.5) {
-    checks.push({
-      id: "led-width-large-short",
-      category: "led",
-      status: "warn",
-      message: `For a ${stageLen}m stage, LED ${ledW}m is more than ~2m shorter — it may look underwhelming.`,
-      suggested: `Consider ${Math.max(stageLen - 2, ledW)}m–${stageLen}m LED width.`,
-    });
-  } else if (shortfall >= 0 && shortfall <= 2) {
-    checks.push({
-      id: "led-width-large-ok",
-      category: "led",
-      status: "pass",
-      message: "On a large stage, LED 1–2m shorter than stage length is usually fine.",
-    });
   }
 
   if (screen.heightM > 3 && screen.type !== "projector") {

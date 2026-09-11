@@ -6,7 +6,6 @@ import {
   SectionTitle,
   Segmented,
   SelectField,
-  SoftSellChip,
   ToggleRow,
   inputClass,
   Field,
@@ -25,14 +24,14 @@ const KINDS: { value: VenueKind; label: string }[] = [
 ];
 
 const POWER: { value: PowerCapacity; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "medium", label: "Medium" },
-  { value: "heavy", label: "Heavy" },
-  { value: "generator", label: "Generator" },
+  { value: "unsure", label: "I'm not too sure" },
+  { value: "venue_provides", label: "Venue provides power" },
+  { value: "need_db", label: "Need to request a DB — venue doesn't provide" },
+  { value: "generator", label: "We'll need a generator" },
 ];
 
 export function VenueStep() {
-  const { config, selectLibraryVenue, setManualVenue, setVenue } = usePlayStore();
+  const { config, selectLibraryVenue, setManualVenue, setVenue, setScreen } = usePlayStore();
   const v = config.venue;
   const locked = v.mode === "library";
 
@@ -135,18 +134,20 @@ export function VenueStep() {
           value={v.depthM}
           onChange={(raw) => setVenue({ depthM: Number(raw) || 0 })}
         />
-        <SelectField
-          label="Power access"
-          value={v.power}
-          disabled={locked}
-          onChange={(power) => setVenue({ power: power as PowerCapacity })}
-        >
-          {POWER.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
-          ))}
-        </SelectField>
+        <div className="sm:col-span-2">
+          <SelectField
+            label="Power on site"
+            hint="Skip this if you're unsure — we'll confirm on the recce."
+            value={v.power}
+            onChange={(power) => setVenue({ power: power as PowerCapacity })}
+          >
+            {POWER.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </SelectField>
+        </div>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -156,7 +157,15 @@ export function VenueStep() {
           onChange={(inHouseAudio) => setVenue({ inHouseAudio })}
           description="Wedding ballrooms often have house PA — confirm before booking external speakers."
         />
-        {v.powerNote ? <SoftSellChip>{v.powerNote}</SoftSellChip> : null}
+        <ToggleRow
+          label="Venue already has LED / screens we can use"
+          checked={v.inHouseScreen}
+          onChange={(inHouseScreen) => {
+            setVenue({ inHouseScreen });
+            setScreen({ needed: !inHouseScreen });
+          }}
+          description="If they have a house screen, we can skip LED rental and quote faster."
+        />
       </div>
     </div>
   );

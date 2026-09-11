@@ -5,7 +5,6 @@ import { usePlayStore } from "@/lib/store";
 import type { PhotoboothType } from "@/lib/types";
 
 const OPTIONS: { value: PhotoboothType; label: string; blurb: string }[] = [
-  { value: "none", label: "No photobooth", blurb: "Skip for now." },
   {
     value: "roving",
     label: "Roving photobooth",
@@ -16,6 +15,12 @@ const OPTIONS: { value: PhotoboothType; label: string; blurb: string }[] = [
     label: "Traditional photobooth",
     blurb: "Props + themed backdrop guests can visit.",
   },
+  {
+    value: "polaroid",
+    label: "Polaroid camera",
+    blurb: "A light roaming option — guests shoot and keep the print.",
+  },
+  { value: "none", label: "No photobooth", blurb: "Skip for now." },
 ];
 
 export function ExtrasStep() {
@@ -24,8 +29,8 @@ export function ExtrasStep() {
   return (
     <div>
       <SectionTitle
-        eyebrow="Step 7 · Extras"
-        title="Extras"
+        eyebrow="Step 7 · Photobooth"
+        title="Photobooth"
         subtitle="Optional engagement that guests take home."
       />
 

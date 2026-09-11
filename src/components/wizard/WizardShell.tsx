@@ -17,6 +17,7 @@ import { VenueStep } from "@/components/wizard/VenueStep";
 import { Button, CheckIcon } from "@/components/wizard/ui";
 import { runSufficiencyEngine } from "@/lib/engine";
 import { estimatePrice } from "@/lib/pricing/estimate";
+import { trackPlan } from "@/lib/analytics";
 import { usePlayStore } from "@/lib/store";
 import { STEP_LABELS, WIZARD_STEPS, type WizardStep } from "@/lib/types";
 
@@ -207,6 +208,22 @@ export function WizardShell() {
   const failCount = checks.filter((c) => c.status === "fail").length;
   const warnCount = checks.filter((c) => c.status === "warn").length;
   const openChecks = checks.filter((c) => c.status === "fail" || c.status === "warn");
+
+  useEffect(() => {
+    const snapshot = usePlayStore.getState().config;
+    const snapPrice = estimatePrice(snapshot);
+    const snapChecks = runSufficiencyEngine(snapshot);
+    trackPlan("wizard_step", {
+      step,
+      config: snapshot,
+      price: { lowSgd: snapPrice.lowSgd, highSgd: snapPrice.highSgd },
+      checksSummary: {
+        failCount: snapChecks.filter((c) => c.status === "fail").length,
+        warnCount: snapChecks.filter((c) => c.status === "warn").length,
+      },
+    });
+  }, [step]);
+
 
   return (
     <div className="min-h-dvh">

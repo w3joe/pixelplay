@@ -151,9 +151,18 @@ describe("computeBudgetFit", () => {
       ...c,
       venue: { ...c.venue, kind: "ballroom" },
       event: { ...c.event, type: "corporate_launch", daytimeOutdoor: false },
-      stage: { ...c.stage, lengthM: 10, widthM: 4, activity: "band" },
-      screen: { type: "outdoor_led", widthM: 10, heightM: 4 },
-      audio: { speakerCount: 8, subwooferCount: 2, micCount: 6, useRecommendedBrand: true },
+      stage: { ...c.stage, lengthM: 10, widthM: 4, activity: "band", needed: true, existing: false },
+      screen: { needed: true, type: "outdoor_led", widthM: 10, heightM: 4 },
+      audio: {
+        speakerCount: 8,
+        subwooferCount: 2,
+        handheldCount: 6,
+        headsetCount: 0,
+        rostrumCount: 0,
+        useRecommendedBrand: true,
+        bandInputs: null,
+        bandInputsUnsure: false,
+      },
       lighting: { package: "both", parCount: 6, movingHeadCount: 5, fogMachine: true },
     };
   }
