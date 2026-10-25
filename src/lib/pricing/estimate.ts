@@ -9,7 +9,7 @@ import {
   type PriceLine,
 } from "@/lib/types";
 
-function paBand(speakerCount: number): { low: number; high: number } {
+export function paBand(speakerCount: number): { low: number; high: number } {
   const known = RATES.paBySpeakerCount[speakerCount];
   if (known) return known;
   if (speakerCount <= 2) return RATES.paBySpeakerCount[2];
@@ -76,15 +76,17 @@ export function estimatePrice(config: PlayConfig): PriceEstimate {
     });
   }
 
-  const pa = paBand(config.audio.speakerCount);
-  lines.push({
-    id: "pa",
-    label: `PA system (${config.audio.speakerCount}× 15″ + mixer)`,
-    lowSgd: pa.low,
-    highSgd: pa.high,
-  });
+  if (config.audio.speakerCount > 0) {
+    const pa = paBand(config.audio.speakerCount);
+    lines.push({
+      id: "pa",
+      label: `PA system (${config.audio.speakerCount}× 15″ + mixer)`,
+      lowSgd: pa.low,
+      highSgd: pa.high,
+    });
+  }
 
-  const mixer = recommendMixer(config);
+  const mixer = config.audio.speakerCount > 0 ? recommendMixer(config) : null;
   if (mixer) {
     const rates = mixer.stagebox ? RATES.mixer48Stagebox : mixer.channels >= 32 ? RATES.mixer32 : RATES.mixer24;
     lines.push({

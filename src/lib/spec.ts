@@ -8,7 +8,6 @@ import {
 } from "@/lib/types";
 import { formatSgdRange } from "@/lib/pricing/estimate";
 import { recommendMixer } from "@/lib/engine/audio";
-import { STEP_LABELS, WIZARD_STEPS } from "@/lib/types";
 
 const POWER_LABEL: Record<PlayConfig["venue"]["power"], string> = {
   unsure: "not sure",
@@ -92,9 +91,3 @@ export function buildSpecText(
 
   return lines.join("\n");
 }
-
-export function stepIndex(step: (typeof WIZARD_STEPS)[number]): number {
-  return WIZARD_STEPS.indexOf(step);
-}
-
-export { STEP_LABELS, WIZARD_STEPS };

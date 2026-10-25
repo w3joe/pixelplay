@@ -1,3 +1,5 @@
+import type { Placement } from "@/lib/builder/types";
+
 export type VenueKind =
   | "ballroom"
   | "wedding_ballroom"
@@ -128,6 +130,8 @@ export interface PlayConfig {
   audio: AudioConfig;
   lighting: LightingConfig;
   extras: ExtrasConfig;
+  /** Grid layout the config was derived from, when it came from the builder. */
+  placements?: Placement[];
 }
 
 export interface PriceLine {
@@ -143,38 +147,6 @@ export interface PriceEstimate {
   highSgd: number;
   disclaimer: string;
 }
-
-export type WizardStep =
-  | "venue"
-  | "event"
-  | "stage"
-  | "screen"
-  | "audio"
-  | "lighting"
-  | "extras"
-  | "summary";
-
-export const WIZARD_STEPS: WizardStep[] = [
-  "venue",
-  "event",
-  "stage",
-  "screen",
-  "audio",
-  "lighting",
-  "extras",
-  "summary",
-];
-
-export const STEP_LABELS: Record<WizardStep, string> = {
-  venue: "Venue",
-  event: "Event",
-  stage: "Stage",
-  screen: "LED / Screen",
-  audio: "Audio",
-  lighting: "Lighting",
-  extras: "Photobooth",
-  summary: "Summary",
-};
 
 export function totalMicCount(audio: AudioConfig): number {
   return audio.handheldCount + audio.headsetCount + audio.rostrumCount;
