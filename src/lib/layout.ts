@@ -1,4 +1,5 @@
 import { baseY, footprintOf, gridFor, originToCenter, stageOf } from "@/lib/builder/grid";
+import type { Placement } from "@/lib/builder/types";
 import type { PlayConfig } from "@/lib/types";
 
 export type Vec3 = [number, number, number];
@@ -18,6 +19,65 @@ export interface VenueLayout {
   speakerYaws: number[];
   /** Stage deck footprint in world space, if there is one. */
   stage: { x0: number; x1: number; z0: number; z1: number; heightM: number } | null;
+  /** Solid kit you can't walk through, as floor-plan boxes. */
+  obstacles: Box[];
+}
+
+export interface Box {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+const box = (x: number, z: number, hx: number, hz: number): Box => ({
+  x0: x - hx,
+  x1: x + hx,
+  z0: z - hz,
+  z1: z + hz,
+});
+
+/** Footprints of the parts of each item a walking person would bump into. */
+function obstaclesFor(placements: Placement[], grid: ReturnType<typeof gridFor>): Box[] {
+  const out: Box[] = [];
+  for (const p of placements) {
+    const { w, d } = footprintOf(p);
+    const [x, z] = originToCenter(grid, p.col, p.row, w, d);
+    const yaw = (p.rotation * Math.PI) / 180;
+    const across = p.rotation === 0 || p.rotation === 180;
+    switch (p.kind) {
+      case "speaker":
+      case "par":
+      case "fog":
+        out.push(box(x, z, 0.3, 0.3));
+        break;
+      case "sub":
+        out.push(box(x, z, 0.42, 0.42));
+        break;
+      case "mic":
+        out.push(p.settings.mic === "rostrum" ? box(x, z, 0.36, 0.3) : box(x, z, 0.18, 0.18));
+        break;
+      case "led": {
+        // The panel hangs at the back of its cells, facing the way it's turned.
+        const half = (p.settings.width ?? 4) / 2;
+        const cx = x - Math.sin(yaw) * 0.32;
+        const cz = z - Math.cos(yaw) * 0.32;
+        out.push(across ? box(cx, cz, half, 0.15) : box(cx, cz, 0.15, half));
+        break;
+      }
+      case "photobooth":
+        out.push(box(x, z, w / 2 - 0.1, d / 2 - 0.1));
+        break;
+      case "truss": {
+        const reach = (Math.max(w, d) - 0.1) / 2;
+        for (const s of [-1, 1]) {
+          out.push(w >= d ? box(x + s * reach, z, 0.14, 0.14) : box(x, z + s * reach, 0.14, 0.14));
+        }
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 /** Ground-stacked speaker layout: pairs across the front, then filling rearward. */
@@ -87,6 +147,7 @@ export function computeVenueLayout(config: PlayConfig): VenueLayout {
             heightM: stage.heightM,
           }
         : null,
+    obstacles: [],
   };
 }
 
@@ -122,6 +183,7 @@ function layoutFromPlacements(config: PlayConfig): VenueLayout {
     subs: placements.filter((p) => p.kind === "sub").map(at),
     speakerYaws: speakers.map((p) => (p.rotation * Math.PI) / 180),
     stage: stageRect,
+    obstacles: obstaclesFor(placements, grid),
   };
 }
 

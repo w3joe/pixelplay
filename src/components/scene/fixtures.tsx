@@ -408,6 +408,61 @@ export function LedWall({
   );
 }
 
+const UP = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Three legs running from a collar on the column down to feet on the floor.
+ * Each leg is aimed along its own collar→foot vector, so the legs always meet
+ * the column instead of floating beside it.
+ */
+function TripodLegs({
+  collarY,
+  footRadius,
+  thickness,
+}: {
+  collarY: number;
+  footRadius: number;
+  thickness: number;
+}) {
+  const legs = useMemo(
+    () =>
+      [0, 1, 2].map((i) => {
+        const a = (i / 3) * Math.PI * 2 + Math.PI / 6;
+        const top = new THREE.Vector3(0, collarY, 0);
+        const foot = new THREE.Vector3(Math.cos(a) * footRadius, 0.01, Math.sin(a) * footRadius);
+        const dir = foot.clone().sub(top);
+        return {
+          position: top.clone().add(foot).multiplyScalar(0.5),
+          quaternion: new THREE.Quaternion().setFromUnitVectors(UP, dir.clone().normalize()),
+          length: dir.length(),
+          foot,
+        };
+      }),
+    [collarY, footRadius],
+  );
+
+  return (
+    <group>
+      <mesh position={[0, collarY, 0]} castShadow>
+        <cylinderGeometry args={[thickness * 2.4, thickness * 2.4, 0.06, 12]} />
+        <meshStandardMaterial {...DARK_METAL} />
+      </mesh>
+      {legs.map((leg, i) => (
+        <group key={i}>
+          <mesh position={leg.position} quaternion={leg.quaternion} castShadow>
+            <cylinderGeometry args={[thickness, thickness, leg.length, 8]} />
+            <meshStandardMaterial {...METAL} />
+          </mesh>
+          <mesh position={leg.foot}>
+            <sphereGeometry args={[thickness * 1.6, 8, 6]} />
+            <meshStandardMaterial {...DARK_METAL} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 export function Speaker({ position, yaw = 0 }: { position: Vec3; yaw?: number }) {
   return (
     <group position={position} rotation={[0, yaw, 0]}>
@@ -416,20 +471,7 @@ export function Speaker({ position, yaw = 0 }: { position: Vec3; yaw?: number })
         <cylinderGeometry args={[0.035, 0.045, 1.16, 12]} />
         <meshStandardMaterial {...METAL} />
       </mesh>
-      {[0, 1, 2].map((i) => {
-        const a = (i / 3) * Math.PI * 2;
-        return (
-          <mesh
-            key={i}
-            position={[Math.cos(a) * 0.28, 0.06, Math.sin(a) * 0.28]}
-            rotation={[0.55, -a, 0]}
-            castShadow
-          >
-            <cylinderGeometry args={[0.022, 0.022, 0.72, 8]} />
-            <meshStandardMaterial {...METAL} />
-          </mesh>
-        );
-      })}
+      <TripodLegs collarY={0.42} footRadius={0.34} thickness={0.02} />
 
       {/* Cabinet with the trapezoid-ish bevel of a real PA box */}
       <RoundedBox
@@ -632,15 +674,7 @@ export function ParCan({
         <cylinderGeometry args={[0.03, 0.042, 1.44, 10]} />
         <meshStandardMaterial {...METAL} />
       </mesh>
-      {[0, 1, 2].map((i) => {
-        const a = (i / 3) * Math.PI * 2;
-        return (
-          <mesh key={i} position={[Math.cos(a) * 0.18, 0.04, Math.sin(a) * 0.18]} rotation={[0.5, -a, 0]}>
-            <cylinderGeometry args={[0.016, 0.016, 0.46, 6]} />
-            <meshStandardMaterial {...METAL} />
-          </mesh>
-        );
-      })}
+      <TripodLegs collarY={0.36} footRadius={0.26} thickness={0.016} />
 
       {/* Lamp head. These stand downstage on the floor, so the can tilts back
           and up to wash the stage — everything below emits along local +Y. */}

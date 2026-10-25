@@ -154,3 +154,19 @@ describe("config + pricing", () => {
     expect(right.col).toBe(stage.col + footprintOf(stage).w);
   });
 });
+
+describe("walkthrough collisions", () => {
+  it("makes placed kit solid, with the LED panel at the back of its cells", async () => {
+    const { computeVenueLayout } = await import("@/lib/layout");
+    const led = makePlacement("led", 8, 0, 0, { width: 4 });
+    const turned = makePlacement("led", 2, 6, 90, { width: 4 });
+    const truss = makePlacement("truss", 4, 9, 0, { length: 6 });
+    const layout = computeVenueLayout(placementsToConfig(hall, event, [led, turned, truss]));
+    const [a, b, ...legs] = layout.obstacles;
+    expect(a.x1 - a.x0).toBeCloseTo(4);
+    expect(a.z1 - a.z0).toBeCloseTo(0.3);
+    expect(b.z1 - b.z0).toBeCloseTo(4);
+    expect(b.x1 - b.x0).toBeCloseTo(0.3);
+    expect(legs).toHaveLength(2);
+  });
+});

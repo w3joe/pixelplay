@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { computeVenueLayout } from "@/lib/layout";
+import { type Box, computeVenueLayout } from "@/lib/layout";
 import type { PlayConfig } from "@/lib/types";
 import { type RefObject, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -41,6 +41,19 @@ const SNAP_SPEED = 4.5;
 
 const tmpEuler = new THREE.Euler(0, 0, 0, "YXZ");
 
+/** How close your body gets to kit before it stops you. */
+const BODY_RADIUS_M = 0.28;
+
+function blocked(obstacles: Box[], x: number, z: number): boolean {
+  return obstacles.some(
+    (b) =>
+      x > b.x0 - BODY_RADIUS_M &&
+      x < b.x1 + BODY_RADIUS_M &&
+      z > b.z0 - BODY_RADIUS_M &&
+      z < b.z1 + BODY_RADIUS_M,
+  );
+}
+
 export function WalkControls({
   config,
   lockSelector,
@@ -54,7 +67,25 @@ export function WalkControls({
   onUnlock: () => void;
   controlsRef?: RefObject<PointerLockControlsImpl | null>;
 }) {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
+
+  // Chrome rejects a lock request made too soon after Esc (and in some
+  // embedded contexts). drei doesn't catch that promise, so it surfaced as an
+  // unhandled error; swallow it — the Paused card stays up and you click again.
+  useEffect(() => {
+    const el = gl.domElement;
+    const original = el.requestPointerLock;
+    el.requestPointerLock = function (this: HTMLCanvasElement, opts?: PointerLockOptions) {
+      try {
+        return Promise.resolve(original.call(this, opts)).catch(() => {});
+      } catch {
+        return Promise.resolve();
+      }
+    };
+    return () => {
+      el.requestPointerLock = original;
+    };
+  }, [gl]);
   const layout = useMemo(() => computeVenueLayout(config), [config]);
 
   const keys = useRef({ forward: false, back: false, left: false, right: false, run: false });
@@ -67,10 +98,18 @@ export function WalkControls({
 
   // Drop the viewer into the room facing the stage.
   useEffect(() => {
-    camera.position.set(0, EYE_HEIGHT_M, layout.D * 0.28);
-    camera.lookAt(0, EYE_HEIGHT_M, layout.stageZ);
+    // Line up with the stage wherever it was dropped, and never spawn inside kit.
+    const sx = layout.stage ? (layout.stage.x0 + layout.stage.x1) / 2 : 0;
+    let spawnX = sx;
+    let spawnZ = layout.D * 0.28;
+    for (let step = 0; step < 40 && blocked(layout.obstacles, spawnX, spawnZ); step++) {
+      spawnX = sx + Math.ceil(step / 2) * (step % 2 ? 0.6 : -0.6);
+      if (step % 10 === 9) spawnZ += 0.8;
+    }
+    camera.position.set(spawnX, EYE_HEIGHT_M, spawnZ);
+    camera.lookAt(sx, EYE_HEIGHT_M, layout.stageZ);
     velocity.current.set(0, 0, 0);
-  }, [camera, layout.D, layout.stageZ]);
+  }, [camera, layout]);
 
   useEffect(() => {
     const setKey = (e: KeyboardEvent, down: boolean) => {
@@ -148,6 +187,13 @@ export function WalkControls({
     const halfD = Math.max(layout.D / 2 - WALL_MARGIN, 0.5);
     x = THREE.MathUtils.clamp(x, -halfL, halfL);
     z = THREE.MathUtils.clamp(z, -halfD, halfD);
+
+    // Placed kit is solid. Resolve each axis separately so you slide along a
+    // speaker or LED wall instead of sticking to it.
+    const px = camera.position.x;
+    const pz = camera.position.z;
+    if (blocked(layout.obstacles, x, pz)) x = px;
+    if (blocked(layout.obstacles, x, z)) z = pz;
 
     // Standing on the deck rather than walking through it. Stages here are
     // ankle-to-knee height, so stepping up is the believable behaviour.

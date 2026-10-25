@@ -521,11 +521,24 @@ function BuilderControls({ itemsRef }: { itemsRef: RefObject<THREE.Group | null>
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       userMoved.current = true;
-      zoomGoal.current = THREE.MathUtils.clamp(
-        zoomGoal.current * Math.exp(-e.deltaY * 0.0015),
+      const before = zoomGoal.current;
+      const after = THREE.MathUtils.clamp(
+        before * Math.exp(-e.deltaY * 0.0015),
         fitZoom.current * 0.5,
         fitZoom.current * 6,
       );
+      zoomGoal.current = after;
+      // Zoom toward the cursor: slide the pivot so the floor under the
+      // pointer stays put on screen.
+      aim(e.clientX, e.clientY);
+      const under = groundAt(0);
+      if (under) {
+        const { grid } = store.getState();
+        target.current.lerp(under, 1 - before / after);
+        target.current.y = 0;
+        target.current.x = THREE.MathUtils.clamp(target.current.x, -grid.cols / 2, grid.cols / 2);
+        target.current.z = THREE.MathUtils.clamp(target.current.z, -grid.rows / 2, grid.rows / 2);
+      }
     };
 
     const onKey = (e: KeyboardEvent) => {
