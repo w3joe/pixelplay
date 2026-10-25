@@ -1,12 +1,12 @@
 # PixelPlay
 
-Public event-tech planner (lead magnet) for [PixelPro](https://pixelpro.sg) — venue → equipment wizard with rule-based sufficiency checks, indicative SGD pricing, 2.5D preview, and email lead capture.
+Public event-layout sandbox (lead magnet) for [PixelPro](https://pixelpro.sg). Pick a Singapore venue, drag stages, LED walls, speakers and lights onto an isometric 1m grid, and get live SGD cost estimates, a sound-coverage map, one-tap recommendations, a plan score, a first-person walkthrough and email lead capture.
 
 ## Stack
 
 - Next.js 15 (App Router) + TypeScript + Tailwind
-- Zustand for wizard state
-- React Three Fiber 2.5D orthographic preview
+- Zustand for builder state (placements + undo/redo)
+- React Three Fiber isometric builder and first-person walkthrough
 - Resend for lead emails (optional; always logs to server)
 
 ## Develop
@@ -21,6 +21,12 @@ npm test
 npm run build
 ```
 
+## How it fits together
+
+- `src/lib/builder/` — the grid model: item catalogue, placement rules (`grid.ts`), auto-placement and starter kits, and `insights.ts` (sound map, tips, score, per-item cost).
+- `placementsToConfig()` folds the grid back into the existing `PlayConfig`, so the rule engine (`src/lib/engine`) and pricing (`src/lib/pricing`) are unchanged.
+- `src/components/builder/` — the sandbox UI; `src/components/scene/` — shared 3D fixtures; `src/components/walk/` — the walkthrough.
+
 ## Environment
 
 Copy `.env.example` to `.env.local`:
@@ -28,12 +34,8 @@ Copy `.env.example` to `.env.local`:
 - `RESEND_API_KEY` — Resend API key
 - `LEADS_TO_EMAIL` — sales inbox
 - `LEADS_FROM_EMAIL` — verified Resend from address (optional; defaults to Resend onboarding)
-- `GEMINI_PROVIDER` — `developer` (Google AI Studio) or `vertex` (Vertex AI); default `developer`
-- `GEMINI_MODEL` — model id used by both providers (e.g. `gemini-3.1-flash-lite`)
-- `GEMINI_API_KEY` / `GOOGLE_API_KEY` — developer API key; also used as Vertex fallback
-- For Vertex: `VERTEX_API_KEY` (preferred), `VERTEX_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), `VERTEX_LOCATION` (or `GOOGLE_CLOUD_LOCATION`, default `us-central1`)
 
-Without Resend env vars, leads still appear in Vercel/server logs as `[pixelplay-lead]`. Without Gemini credentials for the chosen provider, the AI planner card shows a not-configured message.
+Without Resend env vars, leads still appear in Vercel/server logs as `[pixelplay-lead]`.
 
 ## Deploy (Vercel)
 

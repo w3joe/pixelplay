@@ -233,3 +233,27 @@ body {
   animation: pixel-scanline 8s linear infinite;
 }
 
+
+/* ---- Builder ---- */
+
+/* Diorama backdrop behind the transparent 3D canvas */
+.builder-stage {
+  background:
+    radial-gradient(circle at center, rgba(22, 32, 44, 0.06) 1px, transparent 1px) 0 0 / 18px 18px,
+    radial-gradient(1200px 700px at 50% 30%, #f8fbfd 0%, #e3eaf2 70%, #d6dfe9 100%);
+}
+
+@keyframes confetti-pop {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(260deg);
+    opacity: 0;
+  }
+}
+
+.confetti-bit {
+  animation: confetti-pop 0.9s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}

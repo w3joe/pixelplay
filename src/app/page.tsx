@@ -1,7 +1,7 @@
 "use client";
 
-import { WizardShell } from "@/components/wizard/WizardShell";
+import { BuilderShell } from "@/components/builder/BuilderShell";
 
 export default function Home() {
-  return <WizardShell />;
+  return <BuilderShell />;
 }

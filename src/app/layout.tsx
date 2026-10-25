@@ -39,9 +39,9 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
-  title: "PixelPlay — Event tech planner | PixelPro",
+  title: "PixelPlay — Build your event layout | PixelPro",
   description:
-    "Plan LED walls, PA, staging, and lighting for Singapore events. Get a rule-based sufficiency check and indicative price range, then send your plan to PixelPro.",
+    "Drag stages, LED walls, speakers and lights onto a 3D grid of a real Singapore venue. See the cost, your sound coverage and tips as you build, then send the plan to PixelPro.",
 };
 
 export default function RootLayout({

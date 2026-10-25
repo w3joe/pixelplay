@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, CheckIcon, Field, inputClass } from "@/components/wizard/ui";
+import { Button, CheckIcon, Field, inputClass } from "@/components/ui";
 import { usePlayStore } from "@/lib/store";
 import { buildSpecText } from "@/lib/spec";
 import { runSufficiencyEngine } from "@/lib/engine";
