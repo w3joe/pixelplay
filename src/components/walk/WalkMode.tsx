@@ -6,13 +6,12 @@ import { VenueScene } from "@/components/scene/VenueScene";
 import { SpatialAudio, SplProbe } from "@/components/walk/SpatialAudio";
 import { Tablet } from "@/components/walk/Tablet";
 import type { TabletAction } from "@/components/walk/tabletUi";
-import { WalkControls } from "@/components/walk/WalkControls";
+import { type LookHandle, type LookMode, WalkControls } from "@/components/walk/WalkControls";
 import type { TestSignalId } from "@/lib/audio/testSignals";
 import { coverageVerdict, type SplReading } from "@/lib/engine/spl";
 import type { PlayConfig } from "@/lib/types";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 
 const LOCK_SURFACE_ID = "walk-lock-surface";
 
@@ -77,9 +76,16 @@ function Readout({ reading }: { reading: SplReading | null }) {
 
 export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () => void }) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<PointerLockControlsImpl>(null);
+  const controlsRef = useRef<LookHandle>(null);
 
-  const [locked, setLocked] = useState(false);
+  const [lookMode, setLookMode] = useState<LookMode>("paused");
+  const active = lookMode !== "paused";
+
+  const start = useCallback(() => {
+    const ctx = THREE.AudioContext.getContext() as unknown as AudioContext;
+    if (ctx && ctx.state === "suspended") void ctx.resume();
+    controlsRef.current?.start();
+  }, []);
   const [signalId, setSignalId] = useState<TestSignalId>("pink");
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.7);
@@ -169,10 +175,8 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
           </Suspense>
           <WalkControls
             config={config}
-            lockSelector={`#${LOCK_SURFACE_ID}`}
-            onLock={() => setLocked(true)}
-            onUnlock={() => setLocked(false)}
-            controlsRef={controlsRef}
+            onModeChange={setLookMode}
+            handleRef={controlsRef}
           />
           <SpatialAudio config={config} signalId={signalId} playing={playing} volume={volume} />
           <SplProbe config={config} volume={volume} onReading={onReading} />
@@ -180,19 +184,14 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
         </Canvas>
       </SceneErrorBoundary>
 
-      {/* Grabs the pointer on click while unlocked; drei binds its lock handler
-          to this element specifically. Once locked it must stop swallowing
-          events, or clicks never reach the canvas and the tablet is dead. */}
+      {/* Catches the click that starts looking around while paused. Once
+          active it must stop swallowing events, or clicks never reach the
+          canvas and the tablet is dead. */}
       <div
         id={LOCK_SURFACE_ID}
-        className={`absolute inset-0 ${locked ? "pointer-events-none" : ""}`}
+        className={`absolute inset-0 ${active ? "pointer-events-none" : ""}`}
         aria-hidden="true"
-        onClick={() => {
-          const ctx = THREE.AudioContext.getContext() as unknown as AudioContext;
-          if (ctx && ctx.state === "suspended") {
-            void ctx.resume();
-          }
-        }}
+        onClick={start}
       />
 
       {/* HUD — transparent to clicks except on the controls themselves. */}
@@ -222,19 +221,30 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
             Controls
           </p>
           <p className="mt-1 text-xs text-white/70">
-            Press <span className="font-semibold text-white">E</span> to toggle tablet, then aim the
-            crosshair and click
+            {lookMode === "drag" ? (
+              <>
+                <span className="font-semibold text-white">Drag</span> to look ·{" "}
+                <span className="font-semibold text-white">WASD</span> to walk ·{" "}
+                <span className="font-semibold text-white">E</span> tablet, then click it ·{" "}
+                <span className="font-semibold text-white">Esc</span> pause
+              </>
+            ) : (
+              <>
+                Press <span className="font-semibold text-white">E</span> to toggle tablet, then aim the
+                crosshair and click
+              </>
+            )}
           </p>
         </Panel>
       </div>
 
       {/* Crosshair, only while the pointer is captured */}
-      {locked ? (
+      {lookMode === "locked" ? (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 ring-2 ring-black/30"
         />
-      ) : (
+      ) : lookMode === "paused" ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="pointer-events-auto rounded-2xl border border-white/10 bg-black/70 px-6 py-5 text-center backdrop-blur-md">
             <p className="text-base font-semibold text-white">Paused</p>
@@ -244,13 +254,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
             <div className="mt-4 flex justify-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  const ctx = THREE.AudioContext.getContext() as unknown as AudioContext;
-                  if (ctx && ctx.state === "suspended") {
-                    void ctx.resume();
-                  }
-                  controlsRef.current?.lock();
-                }}
+                onClick={start}
                 className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-teal-300"
               >
                 Resume
@@ -265,7 +269,7 @@ export function WalkMode({ config, onExit }: { config: PlayConfig; onExit: () =>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

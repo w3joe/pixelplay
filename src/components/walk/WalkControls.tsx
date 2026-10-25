@@ -1,12 +1,10 @@
 "use client";
 
-import { PointerLockControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { type Box, computeVenueLayout } from "@/lib/layout";
 import type { PlayConfig } from "@/lib/types";
-import { type RefObject, useEffect, useMemo, useRef } from "react";
+import { type RefObject, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import * as THREE from "three";
-import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 
 const EYE_HEIGHT_M = 1.7;
 const WALK_SPEED = 3.2;
@@ -54,38 +52,105 @@ function blocked(obstacles: Box[], x: number, z: number): boolean {
   );
 }
 
+/**
+ * How the view is being steered. "locked" is classic FPS mouse-look; "drag"
+ * is the fallback when the browser refuses pointer lock (no window focus, the
+ * fullscreen hand-off, re-locking too soon after Esc): hold the mouse and drag.
+ */
+export type LookMode = "paused" | "locked" | "drag";
+
+export interface LookHandle {
+  start: () => void;
+  pause: () => void;
+}
+
+/** Radians of turn per pixel of mouse travel — matches three's PointerLockControls. */
+const LOOK_SPEED = 0.002;
+const MAX_PITCH = Math.PI / 2 - 0.01;
+
 export function WalkControls({
   config,
-  lockSelector,
-  onLock,
-  onUnlock,
-  controlsRef,
+  onModeChange,
+  handleRef,
 }: {
   config: PlayConfig;
-  lockSelector: string;
-  onLock: () => void;
-  onUnlock: () => void;
-  controlsRef?: RefObject<PointerLockControlsImpl | null>;
+  onModeChange: (mode: LookMode) => void;
+  handleRef?: RefObject<LookHandle | null>;
 }) {
   const { camera, gl } = useThree();
+  const mode = useRef<LookMode>("paused");
+  const onModeChangeRef = useRef(onModeChange);
+  onModeChangeRef.current = onModeChange;
+  const setMode = (next: LookMode) => {
+    if (mode.current === next) return;
+    mode.current = next;
+    onModeChangeRef.current(next);
+  };
 
-  // Chrome rejects a lock request made too soon after Esc (and in some
-  // embedded contexts). drei doesn't catch that promise, so it surfaced as an
-  // unhandled error; swallow it — the Paused card stays up and you click again.
+  useImperativeHandle(handleRef, () => ({
+    start: () => {
+      const el = gl.domElement;
+      try {
+        // Rejections are expected here and handled — never let one escape.
+        Promise.resolve(el.requestPointerLock()).catch(() => setMode("drag"));
+      } catch {
+        setMode("drag");
+      }
+    },
+    pause: () => {
+      if (document.pointerLockElement === gl.domElement) document.exitPointerLock();
+      setMode("paused");
+    },
+  }));
+
   useEffect(() => {
     const el = gl.domElement;
-    const original = el.requestPointerLock;
-    el.requestPointerLock = function (this: HTMLCanvasElement, opts?: PointerLockOptions) {
-      try {
-        return Promise.resolve(original.call(this, opts)).catch(() => {});
-      } catch {
-        return Promise.resolve();
-      }
+    let dragging = false;
+
+    const turn = (dx: number, dy: number) => {
+      tmpEuler.setFromQuaternion(camera.quaternion, "YXZ");
+      tmpEuler.y -= dx * LOOK_SPEED;
+      tmpEuler.x = THREE.MathUtils.clamp(tmpEuler.x - dy * LOOK_SPEED, -MAX_PITCH, MAX_PITCH);
+      camera.quaternion.setFromEuler(tmpEuler);
     };
+
+    const onLockChange = () => {
+      if (document.pointerLockElement === el) setMode("locked");
+      else if (mode.current === "locked") setMode("paused");
+    };
+    const onLockError = () => {
+      if (mode.current !== "locked") setMode("drag");
+    };
+    const onDown = (e: PointerEvent) => {
+      if (mode.current === "drag" && e.button === 0) dragging = true;
+    };
+    const onUp = () => {
+      dragging = false;
+    };
+    const onMove = (e: MouseEvent) => {
+      if (mode.current === "locked" || (mode.current === "drag" && dragging)) turn(e.movementX, e.movementY);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && mode.current === "drag") setMode("paused");
+    };
+
+    document.addEventListener("pointerlockchange", onLockChange);
+    document.addEventListener("pointerlockerror", onLockError);
+    el.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    document.addEventListener("mousemove", onMove);
+    window.addEventListener("keydown", onKey);
     return () => {
-      el.requestPointerLock = original;
+      document.removeEventListener("pointerlockchange", onLockChange);
+      document.removeEventListener("pointerlockerror", onLockError);
+      el.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      document.removeEventListener("mousemove", onMove);
+      window.removeEventListener("keydown", onKey);
+      if (document.pointerLockElement === el) document.exitPointerLock();
     };
-  }, [gl]);
+  }, [camera, gl]);
+
   const layout = useMemo(() => computeVenueLayout(config), [config]);
 
   const keys = useRef({ forward: false, back: false, left: false, right: false, run: false });
@@ -221,15 +286,5 @@ export function WalkControls({
     }
   });
 
-  return (
-    <PointerLockControls
-      ref={controlsRef}
-      makeDefault
-      // Restrict the click-to-lock handler to the canvas surface, otherwise
-      // drei binds it to the whole document and every HUD button re-locks.
-      selector={lockSelector}
-      onLock={onLock}
-      onUnlock={onUnlock}
-    />
-  );
+  return null;
 }
